@@ -5,20 +5,20 @@
 ## 바로 실행
 
 ```bash
-cd /home/lee/vivecode
+cd /home/lee/pi3x-vibe
 python3 start.py
 ```
 
 Chrome에서 **http://localhost:8000** 을 여세요. `index.html`을 더블클릭하면 브라우저의 ES 모듈 제한 때문에 동작하지 않습니다. 인터넷 연결 없이도 예제 조작, 사진 미리보기, PLY 가져오기·저장을 사용할 수 있습니다.
 
-VS Code에서 `/home/lee/vivecode`를 폴더로 열었다면 **터미널 → 작업 실행 → SPACE: 웹 실행**으로 같은 서버를 시작할 수 있습니다. 원격 SSH·컨테이너 환경에서는 VS Code의 **포트** 탭에서 8000번 포트를 전달하고 브라우저에 표시되는 전달 주소를 사용하세요. 다른 포트가 필요하면 `python3 start.py --port 8001`로 실행할 수 있습니다.
+VS Code에서 `/home/lee/pi3x-vibe`를 폴더로 열었다면 **터미널 → 작업 실행 → SPACE: 웹 실행**으로 같은 서버를 시작할 수 있습니다. 원격 SSH·컨테이너 환경에서는 VS Code의 **포트** 탭에서 8000번 포트를 전달하고 브라우저에 표시되는 전달 주소를 사용하세요. 다른 포트가 필요하면 `python3 start.py --port 8001`로 실행할 수 있습니다.
 
 이 방식은 VS Code의 브라우저 제어 플러그인을 사용하지 않습니다. Colab 계정 로그인과 GPU 런타임 시작만 사용자가 직접 진행합니다.
 
 ## 실제 사진으로 재구성
 
 1. GitHub Pages 웹 화면의 **Colab 연결 → Colab에서 열기**를 누릅니다. 저장소의 `colab/Pi3X_SPACE.ipynb`를 바로 열며 다운로드·업로드는 필요 없습니다.
-2. Colab 마지막 코드 셀의 `VIEWER_URL`을 실제 Pages 주소로 확인합니다. 웹의 **이 페이지로 돌아오는 주소 → 복사**로 가져올 수 있습니다. 아래 배포 설정으로 노트북을 재생성했다면 주소가 이미 들어 있습니다.
+2. Colab 마지막 코드 셀의 `VIEWER_URL`에는 **https://leekh951.github.io/pi3x-vibe/**가 기본으로 들어 있습니다. 로컬 화면으로 돌아오려면 웹의 **이 페이지로 돌아오는 주소 → 복사**로 `http://localhost:8000/` 등 실제 로컬 주소를 넣어주세요.
 3. **런타임 → 런타임 유형 변경 → T4 GPU**를 선택한 뒤 **런타임 → 모두 실행**합니다.
 4. 실행 결과의 **SPACE 웹 화면 연결** 링크를 누릅니다. 웹 화면이 열리면서 Colab에 연결합니다. 링크 대신 출력된 `https://….gradio.live` 주소를 웹의 **Colab 연결** 창에 직접 붙여넣어도 됩니다.
 5. 같은 공간을 다른 위치에서 촬영한 JPG·PNG·WEBP **2–8장**을 추가합니다. 처음에는 **3–4장 + 가볍게**를 권장합니다.
@@ -33,15 +33,15 @@ Colab에서만 Gradio·huggingface_hub·safetensors를 설치합니다. Colab의
 
 이 폴더는 `main` 브랜치의 Git 저장소입니다. `.github/workflows/pages.yml`이 `main`에 푸시할 때마다 사이트를 배포합니다. Python 표준 라이브러리로 웹 파일을 모으고, GitHub 저장소와 실제 Pages 주소를 배포 설정에 넣습니다. 로컬이나 배포 과정에서 npm·pip 설치는 필요 없습니다.
 
-1. VS Code에서 `/home/lee/vivecode`를 폴더로 엽니다.
-2. 왼쪽 **소스 제어 → GitHub에 게시 / Publish to GitHub**를 눌러 로그인하고 **공개 저장소**를 만듭니다. 예를 들어 저장소 이름은 `pi3x-space`로 지정합니다. 초기화와 첫 커밋은 이미 준비되어 있습니다.
+1. VS Code에서 `/home/lee/pi3x-vibe`를 폴더로 엽니다.
+2. 대상 저장소는 **[Leekh951/pi3x-vibe](https://github.com/Leekh951/pi3x-vibe)**입니다. `origin`을 이 저장소에 연결하고 `main` 브랜치를 올립니다. VS Code에서는 **소스 제어 → 변경 내용 동기화 / Sync Changes** 또는 **푸시 / Push**를 사용합니다. 로컬 저장소와 첫 커밋은 이미 준비되어 있습니다.
 3. GitHub 저장소의 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 선택합니다. 기존 안내의 **Deploy from a branch** 대신 이 구성을 사용합니다.
 4. **Actions → Deploy SPACE to GitHub Pages → Run workflow → main**으로 첫 배포를 실행합니다. 처음 게시할 때 Pages가 비활성화되어 실패한 실행이 있다면 같은 화면에서 **Re-run all jobs**로 다시 실행할 수도 있습니다.
-5. 완료되면 **Settings → Pages → Visit site**로 엽니다. 보통 주소는 `https://계정명.github.io/pi3x-space/`입니다. 이후 수정은 커밋 후 **변경 내용 동기화 / Sync Changes**하면 자동 배포됩니다.
+5. 완료되면 **Settings → Pages → Visit site**로 엽니다. 사이트 주소는 **https://leekh951.github.io/pi3x-vibe/**입니다. 이후 수정은 커밋 후 **변경 내용 동기화 / Sync Changes**하면 자동 배포됩니다.
 
 배포 결과에는 HTML·CSS·JavaScript·`vendor/`·`colab/Pi3X_SPACE.ipynb`·`space.config.json`만 들어갑니다. 로컬 서버, 테스트 도구, Git 메타데이터, 스크린샷은 배포 대상에서 제외합니다. 저장소의 원본 파일은 유지합니다. `.nojekyll`이 포함되어 있고 Python GPU 코드는 Colab에서 실행됩니다.
 
-Pages 배포 시 웹의 **Colab에서 열기**는 해당 저장소 `main` 브랜치의 노트북을 직접 엽니다. 노트북 원본의 `VIEWER_URL`이 아직 `localhost`이면 **이 페이지로 돌아오는 주소 → 복사**를 이용해 실제 배포 주소로 바꿔주세요. 아래 원본 설정을 지정하고 노트북을 재생성해 커밋하면 다음부터 해당 주소가 기본값이 됩니다.
+Pages 배포 시 웹의 **Colab에서 열기**는 해당 저장소 `main` 브랜치의 노트북을 직접 엽니다. 노트북 원본의 `VIEWER_URL`도 이 사이트 주소로 맞춰 두었습니다. 저장소 이름이나 도메인을 바꾸면 아래 원본 설정을 수정하고 노트북을 재생성해 커밋하세요.
 
 ### 로컬 페이지와 노트북에도 배포 주소 적용
 
@@ -49,10 +49,10 @@ Pages 배포 시 웹의 **Colab에서 열기**는 해당 저장소 `main` 브랜
 
 ```json
 {
-  "githubRepository": "계정명/pi3x-space",
+  "githubRepository": "Leekh951/pi3x-vibe",
   "githubRef": "main",
   "notebookPath": "colab/Pi3X_SPACE.ipynb",
-  "viewerUrl": "https://계정명.github.io/pi3x-space/"
+  "viewerUrl": "https://leekh951.github.io/pi3x-vibe/"
 }
 ```
 
@@ -72,7 +72,7 @@ python3 scripts/build_pages.py
 `dist/`에 웹 배포 파일이 생성됩니다. 이 폴더는 Git에서 제외됩니다. 주소를 지정해 미리 확인할 수도 있습니다.
 
 ```bash
-python3 scripts/build_pages.py --repository 계정명/pi3x-space --viewer-url https://계정명.github.io/pi3x-space/ --ref main
+python3 scripts/build_pages.py --repository Leekh951/pi3x-vibe --viewer-url https://leekh951.github.io/pi3x-vibe/ --ref main
 ```
 
 로컬 8000에서도 **페이지에서 노트북 보기**로 실제 `.ipynb` 내용을 확인합니다. 아직 저장소를 정하지 않았다면 **실행 코드 전체 복사** 후 Colab의 새 노트북 코드 셀 하나에 붙여넣고 실행하세요. 복사 코드는 현재 웹 주소를 복귀 주소로 자동 적용합니다. 파일 다운로드는 선택 사항입니다.
