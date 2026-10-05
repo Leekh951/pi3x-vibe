@@ -13,6 +13,16 @@ const messages = [];
 for await (const message of watchGPUJob(successful(), { timeout: 100 })) messages.push(message);
 assert(messages.length === 2 && messages[1].data[0] === 'result.ply', 'Receive complete result');
 
+let terminalIndex = 0;
+const terminal = { next: async () => {
+  if (terminalIndex++ === 0) return { done: false, value: { type: 'data', data: ['cloud.ply'] } };
+  if (terminalIndex === 2) return { done: false, value: { type: 'status', stage: 'complete' } };
+  return new Promise(() => {});
+} };
+const terminalMessages = [];
+for await (const message of watchGPUJob(terminal, { timeout: 100 })) terminalMessages.push(message);
+assert(terminalMessages.length === 2 && terminalIndex === 2, 'Stop on successful final status even if SDK never resolves next() again');
+
 function stalled() {
   return { canceled: 0, returned: 0, next: () => new Promise(() => {}),
     cancel() { this.canceled++; }, return() { this.returned++; return Promise.resolve({ done: true }); } };

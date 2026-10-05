@@ -29,7 +29,13 @@ export async function* watchGPUJob(job, { signal, timeout = 300000 } = {}) {
     while (true) {
       const next = await Promise.race([job.next(), stop]);
       if (next.done) { completed = true; break; }
+      // This SDK can send a final status and then leave next() pending. Finish
+      // on its explicit terminal event so a valid PLY is displayed immediately.
+      if (next.value?.type === 'status' && next.value.stage === 'complete') {
+        completed = true; yield next.value; return;
+      }
       yield next.value;
+      if (next.value?.type === 'status' && next.value.stage === 'error') return;
     }
   } finally {
     clearTimeout(timer); signal?.removeEventListener('abort', abort);

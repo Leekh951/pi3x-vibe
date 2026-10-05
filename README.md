@@ -16,7 +16,7 @@
 
 처리 화면은 서버 대기 순서, GPU 준비, 실제 Pi3X 진행을 구분하고 경과 시간을 표시합니다. Gradio의 `process_starts`는 `pending` 상태여도 서버 처리가 시작된 것으로 다룹니다. 대기가 길면 **대기 취소**를 누를 수 있으며, 5분 안에 완료되지 않는 요청도 대기를 끝내고 사진을 유지합니다. 화면의 서버 대기 순서는 ZeroGPU 전체의 GPU 배정 순서를 뜻하지 않습니다.
 
-2026-10-05 웹 클라이언트 검증에서 `handle_file(File)`이 사진을 확장자 없는 Blob으로 바꿔 Gradio가 거부하고, SDK의 오류 후 `return()`도 멈추는 문제를 확인했습니다. `gpu-upload.mjs`로 원본 File 이름과 MIME 정보를 보존해 먼저 업로드하고, `gpu-job.mjs`가 SDK의 정리 응답을 무한히 기다리지 않도록 처리합니다.
+2026-10-05 웹 클라이언트 검증에서 `handle_file(File)`이 사진을 확장자 없는 Blob으로 바꿔 Gradio가 거부하고, SDK의 오류 후 `return()`도 멈추는 문제를 확인했습니다. 성공한 요청도 마지막 완료 이벤트 뒤 `next()`가 멈출 수 있었습니다. `gpu-upload.mjs`로 원본 File 이름과 MIME 정보를 보존해 먼저 업로드하고, `gpu-job.mjs`가 명시적인 완료 이벤트에서 종료하며 SDK의 정리 응답을 무한히 기다리지 않도록 처리합니다.
 
 ## 운영자: 고정 주소 GPU 서버 (Hugging Face Spaces)
 
