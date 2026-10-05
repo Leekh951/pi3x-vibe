@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
 import { PLYLoader } from './vendor/PLYLoader.js';
+import { estimateUp, composeOrientation, rotatePositions } from './orientation.mjs';
 
 export class SpaceViewer {
   constructor(mount, onCount) {
@@ -44,28 +45,51 @@ export class SpaceViewer {
     if (!width || !height) return;
     this.renderer.setSize(width, height); this.camera.aspect = width / height; this.camera.updateProjectionMatrix();
   }
-  setData(data, { flip = false } = {}) {
+  setData(data, { flip = false, automatic = flip } = {}) {
     if (!data.positions.length || data.positions.length % 3) throw Error('표시할 3D 점이 없는 파일입니다.');
+    // Keep an unmodified baseline: repeated adjustments must never accumulate drift.
+    this.basePositions = data.positions.slice();
+    if (flip) for (let i=0; i<this.basePositions.length; i+=3) {
+      this.basePositions[i+1] *= -1; this.basePositions[i+2] *= -1;
+    }
+    this.alignment = automatic ? estimateUp(this.basePositions, data.confidence) : { normal: [0,1,0], found: false };
+    this.orientation = { automatic, roll: 0, pitch: 0 };
+    this.data = { ...data, positions: this.basePositions };
+    this.coordinateSystem = 'Y_UP';
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
     // WebGL uses linear colour internally. Demo and PLY colours arrive as sRGB.
     const linear = new Float32Array(data.colors.length), c = new THREE.Color();
     for (let i = 0; i < linear.length; i += 3) { c.setRGB(data.colors[i], data.colors[i+1], data.colors[i+2], THREE.SRGBColorSpace); c.toArray(linear, i); }
     geometry.setAttribute('color', new THREE.BufferAttribute(linear, 3));
     geometry.setAttribute('confidence', new THREE.BufferAttribute(data.confidence, 1));
-    if (flip) geometry.rotateX(Math.PI); // OpenCV right/down/forward -> Three right/up/back.
+    const oldGeometry = this.cloud?.geometry;
+    if (this.cloud) this.scene.remove(this.cloud);
+    oldGeometry?.dispose();
+    this.cloud = new THREE.Points(geometry, this.material); this.scene.add(this.cloud);
+    this.setOrientation(this.orientation); this.updateCount();
+  }
+  setOrientation(options) {
+    if (!this.cloud) return;
+    this.orientation = { ...this.orientation, ...options };
+    const rotation = composeOrientation(this.alignment.normal, this.orientation);
+    this.data.positions = rotatePositions(this.basePositions, rotation);
+    // Export keeps the source scale; only the displayed copy is centered and scaled.
+    const geometry = this.cloud.geometry;
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.data.positions.slice(), 3));
     geometry.computeBoundingBox();
     const bounds = geometry.boundingBox, size = bounds.getSize(new THREE.Vector3());
     const center = bounds.getCenter(new THREE.Vector3());
     const scale = 5.2 / Math.max(size.x, size.y, size.z, .0001);
     geometry.translate(-center.x, -bounds.min.y, -center.z); geometry.scale(scale, scale, scale);
     geometry.computeBoundingBox(); geometry.computeBoundingSphere();
-    const oldGeometry = this.cloud?.geometry;
-    if (this.cloud) this.scene.remove(this.cloud);
-    oldGeometry?.dispose();
-    this.cloud = new THREE.Points(geometry, this.material); this.scene.add(this.cloud);
     this.material.uniforms.maxY.value = geometry.boundingBox.max.y;
-    this.data = data; this.coordinateSystem=flip?'OPENCV':'Y_UP'; this.fit(); this.updateCount();
+    this.fit();
+  }
+  autoLevel() {
+    if (!this.cloud) return false;
+    this.alignment = estimateUp(this.basePositions, this.data.confidence);
+    this.setOrientation({ automatic: true, roll: 0, pitch: 0 });
+    return this.alignment.found;
   }
   parsePLY(buffer, flip = true) {
     if (buffer.byteLength > 100 * 1024 * 1024) throw Error('100 MB 이하의 PLY 파일을 선택해주세요.');

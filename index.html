@@ -44,6 +44,15 @@
         <div class="processing-overlay" id="processing" hidden><span class="spinner"></span><strong id="processing-label">공간을 이어주는 중</strong><span id="processing-detail">사진 속 공간을 3D로 이어주고 있어요.</span><button id="cancel-generation" class="processing-cancel" type="button" disabled>대기 취소</button></div>
       </div>
       <div class="viewer-controls"><div class="color-control"><span class="control-label">표현</span><button class="color-button active" data-color="original" aria-pressed="true"><span class="color-dot original"></span>원본</button><button class="color-button" data-color="height" aria-pressed="false"><span class="color-dot height"></span>높이</button></div><label class="point-control">점 크기<input type="range" id="point-size" min="1" max="5" step="0.25" value="2"><output id="point-size-value">2.0</output></label><button class="subtle-button export-button" id="export"><svg><use href="#download-icon"/></svg>PLY 저장</button></div>
+      <details class="orientation-controls">
+        <summary>수평 맞추기 <span id="orientation-status">기울기를 조절할 수 있어요</span></summary>
+        <div class="orientation-settings">
+          <div class="orientation-actions"><button class="orientation-button" id="auto-level">자동 수평</button><button class="subtle-button" id="original-orientation">원래 방향</button></div>
+          <label for="orientation-roll">좌우 기울기 <output id="orientation-roll-value">0°</output><input type="range" id="orientation-roll" min="-180" max="180" step="1" value="0"></label>
+          <label for="orientation-pitch">앞뒤 기울기 <output id="orientation-pitch-value">0°</output><input type="range" id="orientation-pitch" min="-180" max="180" step="1" value="0"></label>
+        </div>
+        <p>바닥으로 보이는 평면을 기준으로 정렬해요. 어긋나면 직접 조절해주세요. 저장한 PLY에도 적용됩니다.</p>
+      </details>
       <div class="scene-details"><div class="scene-stat"><span>공간을 이루는 점</span><strong id="point-count">—</strong></div><div class="scene-stat"><span>입력 사진</span><strong id="result-image-count">예제 장면</strong></div><div class="scene-stat"><span>재구성 엔진</span><strong id="engine-label">예제 · 합성 데이터</strong></div><div class="confidence-control"><label for="confidence">노이즈 정리 <output id="confidence-value">10%</output></label><input type="range" id="confidence" min="0" max="95" step="5" value="10"><span id="confidence-hint">신뢰도가 낮은 점을 숨겨요.</span></div></div>
       <div class="studio-footnote"><span>사진에서 점으로, 점에서 공간으로.</span><span>POWERED BY <a href="https://github.com/yyfz/Pi3" target="_blank" rel="noopener">π³ / Pi3X</a></span></div>
     </section>

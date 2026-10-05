@@ -35,6 +35,10 @@ jobs:
         run: node --experimental-default-type=module scripts/test_gradio_transport.mjs
       - name: Check browser script syntax
         run: node --input-type=module --check < app.js
+      - name: Validate upright point clouds and PLY round trips
+        run: |
+          node scripts/test_orientation.mjs
+          node --experimental-default-type=module scripts/test_viewer_orientation.mjs
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@v5

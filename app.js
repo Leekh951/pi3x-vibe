@@ -9,6 +9,15 @@ let toastTimer;
 function toast(message) { $('toast').textContent=message; $('toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,5500); }
 function status(message,error=false) { $('task-status').textContent=message; $('task-status').classList.toggle('error',error); }
 function setView(top=false) { state.viewer?.fit(top); for(const [id,active] of [['view-top',top],['view-perspective',!top]]) { $(id).classList.toggle('active',active); $(id).setAttribute('aria-pressed',String(active)); } $('auto-rotate').classList.remove('active'); $('auto-rotate').setAttribute('aria-pressed','false'); }
+function syncOrientation() {
+  const orientation=state.viewer?.orientation;
+  if(!orientation)return;
+  for(const axis of ['roll','pitch']) {
+    $(`orientation-${axis}`).value=orientation[axis];
+    $(`orientation-${axis}-value`).value=orientation[axis]+'°';
+  }
+  $('orientation-status').textContent=orientation.roll||orientation.pitch ? '직접 조절한 방향' : orientation.automatic && state.viewer.alignment.found ? '자동으로 수평을 맞췄어요' : orientation.automatic ? '평면을 찾기 어려워요 · 직접 조절' : '원래 방향';
+}
 function showDemo() {
   if (state.busy || !state.viewer) return;
   state.viewer.setData(makeDemo()); state.scene='demo';
@@ -17,7 +26,7 @@ function showDemo() {
   $('scene-caption-title').textContent='The quiet corner';
   $('scene-description').textContent='직접 회전하고, 가까이 들여다보세요.';
   $('result-image-count').textContent='예제 장면'; $('engine-label').textContent='예제 · 합성 데이터';
-  $('confidence').disabled=false; $('confidence-hint').textContent='신뢰도가 낮은 점을 숨겨요.'; setView();
+  $('confidence').disabled=false; $('confidence-hint').textContent='신뢰도가 낮은 점을 숨겨요.'; syncOrientation(); setView();
 }
 function renderImages() {
   $('image-count').textContent=`${state.images.length} / 8`;
@@ -75,7 +84,7 @@ const backend = new GPUBackend({onStatus: phase => {
 }});
 function setBusy(busy) {
   state.busy=busy;$('processing').hidden=!busy;
-  for(const id of ['generate','dropzone','demo-button','import-button','export'])$(id).disabled=busy;
+  for(const id of ['generate','dropzone','demo-button','import-button','export','auto-level','original-orientation','orientation-roll','orientation-pitch'])$(id).disabled=busy;
   document.querySelectorAll('[data-quality],.remove-image').forEach(b=>b.disabled=busy);
   $('generate').querySelector('span').textContent=busy?'공간을 만드는 중…':'3D 공간 만들기';
   $('cancel-generation').disabled=!busy || !state.activeController;
@@ -134,7 +143,7 @@ $('generate').onclick=async()=>{
     $('scene-caption-title').textContent='My reconstructed space';$('scene-description').textContent='사진 속 공간이 새로운 시점으로 펼쳐집니다.';
     $('result-image-count').textContent=`${meta.image_count||state.images.length}장`;$('engine-label').textContent='Pi3X';
     $('confidence').disabled=!result.hasConfidence;$('confidence-hint').textContent=result.hasConfidence?'신뢰도가 낮은 점을 숨겨요.':'이 파일에는 신뢰도 정보가 없어요.';
-    setView();status(`완성됐어요${meta.elapsed_seconds?` · ${meta.elapsed_seconds}초`:''}. 회전하며 공간을 살펴보세요.`);toast('나만의 3D 공간이 완성됐어요.');
+    syncOrientation();setView();status(`완성됐어요${meta.elapsed_seconds?` · ${meta.elapsed_seconds}초`:''}. 회전하며 공간을 살펴보세요.`);toast('나만의 3D 공간이 완성됐어요.');
   }catch(e){
     const message=e instanceof BackendUnavailable || ['AbortError','TimeoutError'].includes(e.name) ? e.message : /quota|daily.*GPU|GPU.*budget/i.test(e.message||'') ? '무료 GPU 사용량이 부족해요. 사용량이 초기화된 뒤 다시 시도해주세요.' : '공간을 만들지 못했어요. 사진 수를 줄이거나 다른 사진으로 다시 시도해주세요.';
     status(message,true);toast(message);state.client=null;backend.invalidate();
@@ -148,6 +157,19 @@ $('auto-rotate').onclick=()=>{if(!state.viewer)return;const active=!state.viewer
 $('canvas-mount').addEventListener('pointerdown',()=>{$('auto-rotate').classList.remove('active');$('auto-rotate').setAttribute('aria-pressed','false');});
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('viewer').requestFullscreen();}catch{toast('이 브라우저에서는 전체 화면을 사용할 수 없어요.');}};
 $('point-size').oninput=e=>{const n=Number(e.target.value);state.viewer?.setSize(n);$('point-size-value').value=n.toFixed(1);};
+$('auto-level').onclick=()=>{
+  if(state.busy||!state.viewer)return;
+  const found=state.viewer.autoLevel();syncOrientation();setView();
+  toast(found?'바닥으로 보이는 평면에 맞춰 정렬했어요.':'뚜렷한 평면을 찾지 못했어요. 기울기를 직접 조절해주세요.');
+};
+$('original-orientation').onclick=()=>{
+  if(state.busy||!state.viewer)return;
+  state.viewer.setOrientation({automatic:false,roll:0,pitch:0});syncOrientation();setView();
+};
+for(const axis of ['roll','pitch']) $(`orientation-${axis}`).oninput=e=>{
+  if(state.busy||!state.viewer)return;
+  state.viewer.setOrientation({[axis]:Number(e.target.value)});syncOrientation();setView();
+};
 $('confidence').oninput=e=>{const n=Number(e.target.value);state.viewer?.setThreshold(n/100);$('confidence-value').value=n+'%';};
 document.querySelectorAll('[data-color]').forEach(button=>button.onclick=()=>{state.viewer?.setColor(button.dataset.color);document.querySelectorAll('[data-color]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});});
 $('import-button').onclick=()=>$('ply-input').click();
@@ -159,12 +181,12 @@ $('ply-input').onchange=async e=>{
     const result=state.viewer.parsePLY(await file.arrayBuffer());state.scene='import';
     $('scene-title').textContent=file.name;$('scene-tag').innerHTML='<span></span>IMPORTED SPACE';$('scene-caption-title').textContent='Your saved space';$('scene-description').textContent='저장한 결과를 다시 탐색해보세요.';
     $('result-image-count').textContent='—';$('engine-label').textContent='PLY 불러오기';$('confidence').disabled=!result.hasConfidence;
-    $('confidence-hint').textContent=result.hasConfidence?'신뢰도가 낮은 점을 숨겨요.':'이 파일에는 신뢰도 정보가 없어요.';setView();toast('저장한 3D 공간을 불러왔어요.');
+    $('confidence-hint').textContent=result.hasConfidence?'신뢰도가 낮은 점을 숨겨요.':'이 파일에는 신뢰도 정보가 없어요.';syncOrientation();setView();toast('저장한 3D 공간을 불러왔어요.');
   }catch(error){toast(error.message||'PLY를 읽지 못했어요. 파일을 확인해주세요.');}
 };
 $('export').onclick=()=>{
   if(!state.viewer||state.busy)return;
-  try { const blob=state.viewer.exportPLY(),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=state.scene==='demo'?'SPACE_synthetic_demo.ply':'SPACE_reconstruction.ply';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);toast('현재 노이즈 설정을 적용한 PLY를 저장했어요.'); }
+  try { const blob=state.viewer.exportPLY(),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=state.scene==='demo'?'SPACE_synthetic_demo.ply':'SPACE_reconstruction.ply';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);toast('수평과 노이즈 설정을 적용한 PLY를 저장했어요.'); }
   catch(e){toast(e.message);}
 };
 try {
