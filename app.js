@@ -1,0 +1,175 @@
+import { makeDemo } from './demo.js';
+import { SpaceViewer } from './viewer.js';
+import { initNotebook } from './notebook.js';
+const $ = id => document.getElementById(id);
+const state = { images: [], quality: 'fast', client: null, api: null, busy: false, viewer: null, scene: 'demo', connecting: false };
+let toastTimer;
+function toast(message) { $('toast').textContent=message; $('toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,5500); }
+function status(message,error=false) { $('task-status').textContent=message; $('task-status').classList.toggle('error',error); }
+function setView(top=false) { state.viewer?.fit(top); for(const [id,active] of [['view-top',top],['view-perspective',!top]]) { $(id).classList.toggle('active',active); $(id).setAttribute('aria-pressed',String(active)); } $('auto-rotate').classList.remove('active'); $('auto-rotate').setAttribute('aria-pressed','false'); }
+function showDemo() {
+  if (state.busy || !state.viewer) return;
+  state.viewer.setData(makeDemo()); state.scene='demo';
+  $('scene-title').textContent='작은 거실, 큰 가능성';
+  $('scene-tag').innerHTML='<span></span>INTERACTIVE DEMO';
+  $('scene-caption-title').textContent='The quiet corner';
+  $('scene-description').textContent='직접 회전하고, 가까이 들여다보세요.';
+  $('result-image-count').textContent='예제 장면'; $('engine-label').textContent='예제 · 합성 데이터';
+  $('confidence').disabled=false; $('confidence-hint').textContent='신뢰도가 낮은 점을 숨겨요.'; setView();
+}
+function renderImages() {
+  $('image-count').textContent=`${state.images.length} / 8`;
+  $('image-list').replaceChildren();
+  state.images.forEach((entry,index)=>{
+    const card=document.createElement('div'); card.className='image-thumb';
+    const img=document.createElement('img');img.src=entry.url;img.alt=entry.file.name;
+    const number=document.createElement('span');number.textContent=String(index+1).padStart(2,'0');
+    const remove=document.createElement('button');remove.className='remove-image';remove.textContent='×';remove.title=entry.file.name+' 삭제';remove.setAttribute('aria-label',entry.file.name+' 삭제');remove.disabled=state.busy;
+    remove.onclick=()=>{URL.revokeObjectURL(entry.url);state.images.splice(index,1);renderImages();};
+    card.append(img,number,remove);$('image-list').append(card);
+  });
+  if(!state.busy)status(state.images.length<2 ? '같은 공간의 사진을 2장 이상 추가해주세요.' : state.client ? '준비됐어요. 나만의 공간을 만들어보세요.' : '사진이 준비됐어요. Colab을 연결해주세요.');
+}
+async function addImages(files) {
+  if(state.busy)return;
+  const errors=[];
+  for(const file of files) {
+    if(state.images.length>=8){errors.push('사진은 최대 8장까지 추가할 수 있어요.');break;}
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)){errors.push('JPG, PNG, WEBP 사진을 선택해주세요.');continue;}
+    if(file.size>15*1024*1024){errors.push('장당 15 MB 이하의 사진을 선택해주세요.');continue;}
+    if(state.images.some(x=>x.file.name===file.name&&x.file.size===file.size&&x.file.lastModified===file.lastModified))continue;
+    const url=URL.createObjectURL(file);
+    try { const img=new Image();img.src=url;await img.decode();if(img.width<28||img.height<28)throw Error(); }
+    catch { URL.revokeObjectURL(url);errors.push('읽을 수 없는 사진이 있어요. 다른 파일을 선택해주세요.');continue; }
+    if(state.busy||state.images.length>=8){URL.revokeObjectURL(url);continue;}
+    state.images.push({file,url});
+  }
+  renderImages();if(errors.length)toast([...new Set(errors)].join(' '));
+}
+$('dropzone').onclick=()=>$('image-input').click();
+$('image-input').onchange=async e=>{await addImages(e.target.files);e.target.value='';};
+for(const event of ['dragenter','dragover'])$('dropzone').addEventListener(event,e=>{e.preventDefault();if(!state.busy)$('dropzone').classList.add('dragover');});
+for(const event of ['dragleave','drop'])$('dropzone').addEventListener(event,e=>{e.preventDefault();$('dropzone').classList.remove('dragover');if(event==='drop')addImages(e.dataTransfer.files);});
+document.querySelectorAll('[data-quality]').forEach(button=>button.onclick=()=>{
+  if(state.busy)return;state.quality=button.dataset.quality;
+  document.querySelectorAll('[data-quality]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});
+  $('quality-note').textContent=state.quality==='fast'?'Colab T4에서도 시작하기 좋은 설정이에요.':'GPU 메모리를 더 사용해요. 먼저 사진 2–4장으로 시도하세요.';
+});
+$('connect-open').onclick=()=>{if(!state.busy)$('connect-dialog').showModal();};
+$('guide-open').onclick=()=>$('guide-dialog').showModal();
+initNotebook(toast);
+for(const dialog of [$('connect-dialog'),$('guide-dialog'),$('notebook-dialog')])dialog.addEventListener('click',e=>{if(e.target!==dialog)return;const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();});
+function normalizeEndpoint(value) {
+  let url;try{url=new URL(value.trim());}catch{throw Error('https://로 시작하는 Colab 주소를 입력해주세요.');}
+  if(url.protocol!=='https:' || !/^[a-z0-9-]+\.gradio\.live$/i.test(url.hostname)||url.username||url.password||url.port)throw Error('Colab에서 생성된 https://…gradio.live 주소를 입력해주세요.');
+  return url.origin;
+}
+$('connect-submit').onclick=async()=>{
+  if(state.connecting)return;
+  let endpoint;try{endpoint=normalizeEndpoint($('endpoint').value);}catch(e){$('connect-status').textContent=e.message;return;}
+  state.connecting=true;$('connect-submit').disabled=true;$('connect-status').textContent='Colab 서버를 확인하고 있어요…';
+  let candidate=null;
+  try {
+    state.api ??= await import('./vendor/gradio-client.js');
+    candidate=await state.api.Client.connect(endpoint,{events:['data','status']});
+    const info=await candidate.view_api();
+    if(!info.named_endpoints?.['/reconstruct'])throw Error('Pi3X SPACE 노트북의 주소인지 확인해주세요.');
+    state.client?.close?.();state.client=candidate;candidate=null;
+    $('connection-dot').classList.add('connected');$('connection-label').textContent='Colab 연결됨';
+    $('connect-dialog').close();$('connect-status').textContent='';renderImages();toast('Colab GPU가 연결됐어요. 이제 공간을 만들어보세요.');
+  }catch(e){candidate?.close?.();$('connect-status').textContent='연결하지 못했어요. 노트북 마지막 셀이 실행 중인지, 주소가 맞는지 확인해주세요.';console.warn('Colab connection:',e.message);}
+  finally{state.connecting=false;$('connect-submit').disabled=false;}
+};
+$('endpoint').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('connect-submit').click();}});
+function setBusy(busy) {
+  state.busy=busy;$('processing').hidden=!busy;
+  for(const id of ['generate','dropzone','connect-open','demo-button','import-button','export'])$(id).disabled=busy;
+  document.querySelectorAll('[data-quality],.remove-image').forEach(b=>b.disabled=busy);
+  $('generate').querySelector('span').textContent=busy?'공간을 만드는 중…':'3D 공간 만들기';
+}
+$('generate').onclick=async()=>{
+  if(state.busy)return;
+  if(!state.viewer){toast('3D 뷰어를 사용할 수 없어요. WebGL을 지원하는 브라우저에서 열어주세요.');return;}
+  if(state.images.length<2){toast('같은 공간의 사진을 2장 이상 추가해주세요.');$('dropzone').focus();return;}
+  if(!state.client){$('connect-dialog').showModal();return;}
+  setBusy(true);status('선택한 사진을 Colab으로 전송하고 있어요.');
+  $('processing-label').textContent='사진을 Colab으로 보내는 중';$('processing-detail').textContent='업로드 후 GPU에서 공간을 재구성합니다.';
+  try {
+    const job=state.client.submit('/reconstruct',{images:state.images.map(x=>state.api.handle_file(x.file)),quality:state.quality});
+    let output;
+    for await(const message of job) {
+      if(message.type==='data')output=message.data;
+      if(message.type==='status') {
+        if(message.stage==='error')throw Error(message.message||'Colab에서 재구성에 실패했습니다.');
+        $('processing-label').textContent=message.stage==='pending'?'GPU 순서를 기다리는 중':'공간을 이어주는 중';
+        const desc=message.progress_data?.find(p=>p.desc)?.desc;
+        $('processing-detail').textContent=desc || (message.stage==='pending'&&message.position!=null?`대기 순서 ${message.position+1}번째`:'첫 실행은 모델을 불러오는 데 시간이 걸릴 수 있어요.');
+      }
+    }
+    const file=output?.[0];
+    if(!file?.url&&!file?.path)throw Error('Colab에서 결과 파일을 받지 못했습니다. 다시 시도해주세요.');
+    $('processing-label').textContent='나만의 공간을 열고 있어요';
+    const endpoint=normalizeEndpoint($('endpoint').value);
+    let url=file.url?new URL(file.url,endpoint):null;
+    // Gradio behind a share tunnel can return an internal file URL. Use the
+    // returned server path through the connected public API in that case.
+    if(!url||url.protocol!=='https:'||url.origin!==endpoint) {
+      if(typeof file.path!=='string'||!file.path)throw Error('결과 파일 주소를 확인할 수 없습니다.');
+      const prefix=state.client.config?.api_prefix||'/gradio_api';
+      url=new URL(`${prefix}/file=${encodeURIComponent(file.path)}`,endpoint);
+    }
+    const response=await fetch(url.href);if(!response.ok)throw Error('결과를 가져오지 못했어요. Colab 연결을 확인해주세요.');
+    const result=state.viewer.parsePLY(await response.arrayBuffer());state.scene='result';
+    const meta=output[1]||{};
+    $('scene-title').textContent='나의 첫 번째 공간';$('scene-tag').innerHTML='<span></span>YOUR RECONSTRUCTION';
+    $('scene-caption-title').textContent='My reconstructed space';$('scene-description').textContent='사진 속 공간이 새로운 시점으로 펼쳐집니다.';
+    $('result-image-count').textContent=`${meta.image_count||state.images.length}장`;$('engine-label').textContent='Pi3X · Colab GPU';
+    $('confidence').disabled=!result.hasConfidence;$('confidence-hint').textContent=result.hasConfidence?'신뢰도가 낮은 점을 숨겨요.':'이 파일에는 신뢰도 정보가 없어요.';
+    setView();status(`완성됐어요${meta.elapsed_seconds?` · ${meta.elapsed_seconds}초`:''}. 회전하며 공간을 살펴보세요.`);toast('나만의 3D 공간이 완성됐어요.');
+  }catch(e){status('재구성에 실패했어요. 사진 수를 줄이거나 Colab 연결을 확인해주세요.',true);toast(e.message||'Colab에서 오류가 발생했어요. 노트북 출력을 확인해주세요.');console.warn('Reconstruction:',e);}
+  finally{setBusy(false);}
+};
+$('demo-button').onclick=()=>{showDemo();toast('합성 예제 장면이에요. 드래그해 공간을 탐색해보세요.');};
+$('view-top').onclick=()=>setView(true);$('view-perspective').onclick=()=>setView();$('reset-view').onclick=()=>setView();
+$('auto-rotate').onclick=()=>{if(!state.viewer)return;const active=!state.viewer.controls.autoRotate;state.viewer.controls.autoRotate=active;$('auto-rotate').classList.toggle('active',active);$('auto-rotate').setAttribute('aria-pressed',String(active));};
+$('canvas-mount').addEventListener('pointerdown',()=>{$('auto-rotate').classList.remove('active');$('auto-rotate').setAttribute('aria-pressed','false');});
+$('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('viewer').requestFullscreen();}catch{toast('이 브라우저에서는 전체 화면을 사용할 수 없어요.');}};
+$('point-size').oninput=e=>{const n=Number(e.target.value);state.viewer?.setSize(n);$('point-size-value').value=n.toFixed(1);};
+$('confidence').oninput=e=>{const n=Number(e.target.value);state.viewer?.setThreshold(n/100);$('confidence-value').value=n+'%';};
+document.querySelectorAll('[data-color]').forEach(button=>button.onclick=()=>{state.viewer?.setColor(button.dataset.color);document.querySelectorAll('[data-color]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});});
+$('import-button').onclick=()=>$('ply-input').click();
+$('ply-input').onchange=async e=>{
+  const file=e.target.files[0];e.target.value='';if(!file||state.busy)return;
+  if(!state.viewer){toast('WebGL을 지원하는 브라우저에서 열어주세요.');return;}
+  try {
+    if(file.size>100*1024*1024)throw Error('100 MB 이하의 PLY 파일을 선택해주세요.');
+    const result=state.viewer.parsePLY(await file.arrayBuffer());state.scene='import';
+    $('scene-title').textContent=file.name;$('scene-tag').innerHTML='<span></span>IMPORTED SPACE';$('scene-caption-title').textContent='Your saved space';$('scene-description').textContent='저장한 결과를 다시 탐색해보세요.';
+    $('result-image-count').textContent='—';$('engine-label').textContent='PLY 불러오기';$('confidence').disabled=!result.hasConfidence;
+    $('confidence-hint').textContent=result.hasConfidence?'신뢰도가 낮은 점을 숨겨요.':'이 파일에는 신뢰도 정보가 없어요.';setView();toast('저장한 3D 공간을 불러왔어요.');
+  }catch(error){toast(error.message||'PLY를 읽지 못했어요. 파일을 확인해주세요.');}
+};
+$('export').onclick=()=>{
+  if(!state.viewer||state.busy)return;
+  try { const blob=state.viewer.exportPLY(),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=state.scene==='demo'?'SPACE_synthetic_demo.ply':'SPACE_reconstruction.ply';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);toast('현재 노이즈 설정을 적용한 PLY를 저장했어요.'); }
+  catch(e){toast(e.message);}
+};
+try {
+  state.viewer=new SpaceViewer($('canvas-mount'),count=>$('point-count').textContent=new Intl.NumberFormat('ko-KR').format(count));showDemo();
+  $('canvas-mount').querySelector('canvas').setAttribute('aria-label','드래그로 회전하고 확대할 수 있는 3D 점 구름');
+  document.documentElement.dataset.ready='true';
+}catch(e){$('viewer-error').hidden=false;$('viewer-error').textContent='3D 화면을 시작하지 못했어요. Chrome 또는 Edge에서 하드웨어 가속을 켠 뒤 다시 열어주세요.';console.error(e);}
+// Read-only browser test access; exposed only when explicitly requested.
+if(new URLSearchParams(location.search).has('test'))window.spaceTest={state,addImages,normalizeEndpoint,showDemo};
+
+// A link printed by the Colab notebook connects the viewer on explicit navigation.
+// Strip the query afterwards so an expired runtime is not retried on every reload.
+const colabEndpoint = new URLSearchParams(location.search).get('colab');
+if(colabEndpoint) {
+  const cleanUrl = new URL(location.href);cleanUrl.searchParams.delete('colab');
+  history.replaceState(null,'',cleanUrl);
+  try {
+    $('endpoint').value=normalizeEndpoint(colabEndpoint);
+    if(state.viewer){$('connect-dialog').showModal();$('connect-submit').click();}
+  }catch(error){toast(error.message);}
+}

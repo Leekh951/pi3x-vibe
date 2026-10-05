@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "SPACE: 웹 실행",
+      "type": "process",
+      "command": "python3",
+      "args": ["${workspaceFolder}/start.py"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "space",
+        "pattern": {"regexp": "^(.*):(\\d+):\\s*(.*)$", "file": 1, "line": 2, "message": 3},
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^SPACE STARTING",
+          "endsPattern": "^SPACE READY:"
+        }
+      },
+      "presentation": {"reveal": "always", "panel": "dedicated", "clear": true}
+    }
+  ]
+}
