@@ -39,7 +39,7 @@ class PagesTests(unittest.TestCase):
             parser.feed((output / "index.html").read_text())
             references = [("index.html", value) for value in parser.references]
             # Check module imports, lazy imports and notebook/config fetches, including vendor dependencies.
-            for script in output.rglob("*.js"):
+            for script in [*output.rglob("*.js"), *output.rglob("*.mjs")]:
                 source = script.read_text()
                 relative = re.findall(r"(?:from\s*|import\s*\(|new URL\s*\()\s*['\"](\.[^'\"]+)['\"]", source)
                 if script.name == "gradio-client.js":
@@ -48,13 +48,24 @@ class PagesTests(unittest.TestCase):
                     self.assertIn('typeof window&&"WebSocket"in window', source)
                     relative = [value for value in relative if value != "./wrapper-CviSselG.js"]
                 references.extend((script.relative_to(output).as_posix(), value) for value in relative)
-            self.assertGreater(len(references), 10)
+            self.assertIn(("app.js", "./gpu-backend.mjs"), references)
+            self.assertIn(("gpu-backend.mjs", "./space.config.json"), references)
             prefix = urlsplit(config["viewerUrl"]).path
             for source, reference in references:
                 target = urlsplit(urljoin(urljoin(config["viewerUrl"], source), reference)).path
                 self.assertTrue(target.startswith(prefix), target)
                 self.assertTrue((output / target[len(prefix):]).exists(), reference)
             self.assertTrue((output / "vendor/three.module.js").is_file())
+            # The public page exposes photos and results, with no notebook/setup controls.
+            html = (output / "index.html").read_text()
+            for removed in ('id="connect-dialog"', 'id="notebook-dialog"', 'id="colab-open"', 'id="endpoint"'):
+                self.assertNotIn(removed, html)
+            self.assertIn('id="generate"', html)
+            self.assertIn('id="image-input"', html)
+            ids = set(re.findall(r'\bid="([^"]+)"', html))
+            for referenced_id in re.findall(r"\$\(['\"]([^'\"]+)['\"]\)", (output / "app.js").read_text()):
+                self.assertIn(referenced_id, ids, referenced_id)
+            self.assertEqual(config["colabEndpoint"], json.loads(original_config)["colabEndpoint"])
             notebook = json.loads((output / "colab/Pi3X_SPACE.ipynb").read_text())
             for cell in notebook["cells"]:
                 if cell["cell_type"] == "code":

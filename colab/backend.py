@@ -41,9 +41,11 @@ def load_model(progress):
     checkpoint = hf_hub_download(
         repo_id="yyfz233/Pi3X", filename="model.safetensors", revision=WEIGHTS_REVISION
     )
-    # Instantiate on meta to avoid two copies of the model in Colab's host RAM.
-    # Only image-only branches are needed for this application.
-    with torch.device("meta"):
+    # DINOv2 reads scalar initialization values (linspace(...).item()), so its
+    # constructor must run on CPU. A global meta device breaks that constructor.
+    # Safetensors maps the checkpoint; assign=True replaces the random parameters
+    # instead of copying checkpoint tensors into a second parameter allocation.
+    with torch.device("cpu"):
         candidate = Pi3X(use_multimodal=False).eval()
     expected = set(candidate.state_dict())
     with safe_open(checkpoint, framework="pt", device="cpu") as handle:
@@ -183,7 +185,7 @@ def launch(viewer_url="http://localhost:8000/"):
     if not torch.cuda.is_available():
         raise RuntimeError("GPU가 연결되지 않았습니다. 런타임 유형을 T4 GPU로 변경하고 다시 실행하세요.")
     with gr.Blocks(title="Pi3X SPACE · Colab GPU") as demo:
-        gr.Markdown("# π³ SPACE · Colab GPU\n이 탭을 열어두고 아래 공개 주소를 SPACE 웹 화면에 붙여넣으세요.\n"
+        gr.Markdown("# π³ SPACE · 운영자 GPU 서버\n이 탭을 유지하고 공개 주소를 사이트 설정의 colabEndpoint에 등록하세요. 방문자는 사진만 올리면 됩니다.\n"
                     "사진은 이 Colab 런타임에서 처리됩니다. 모델 가중치는 비상업 연구·교육용입니다.")
         images = gr.File(label="같은 공간의 사진 2–8장", file_count="multiple", type="filepath", file_types=["image"])
         quality = gr.Radio(choices=[("가볍게", "fast"), ("섬세하게", "detail")], value="fast", label="품질")

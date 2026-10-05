@@ -1,11 +1,13 @@
 from chrome_cdp import CDP
 import json
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1]
 c=CDP();c.call('Page.enable');c.call('Runtime.enable')
 c.call('Page.reload',{'ignoreCache':True})
 c.js('new Promise(resolve=>setTimeout(resolve,600))')
 script=r'''(async()=>{
  const results=[]; const check=(name,condition)=>{results.push({name,pass:!!condition});if(!condition)throw Error('FAIL: '+name);};
- const T=window.spaceTest,S=T.state,V=S.viewer,$=id=>document.getElementById(id);
+ const T=window.spaceTest,S=T.state,V=S.viewer,B=T.backend,$=id=>document.getElementById(id);
  check('WebGL renders',document.documentElement.dataset.ready==='true'&&V.renderer.domElement.width>0);
  check('Synthetic demo labelled', $('engine-label').textContent.includes('합성')&&V.data.confidence.length>100000);
  $('view-top').click();check('Top view',V.camera.position.y>V.camera.position.x&&$('view-top').getAttribute('aria-pressed')==='true');
@@ -30,16 +32,19 @@ script=r'''(async()=>{
  document.querySelector('.remove-image').click();check('Photo removal',S.images.length===1);
  await T.addImages([photo(1),...Array.from({length:12},(_,i)=>photo(i+3))]);check('Photo count limited to eight',S.images.length===8);
  $('guide-open').click();check('Guide opens', $('guide-dialog').open);$('guide-dialog').close();
- $('generate').click();check('Missing connection opens dialog',$('connect-dialog').open);$('connect-dialog').close();
+ check('Visitors have no notebook or connection setup',!$('connect-dialog')&&!$('notebook-dialog')&&!$('connect-open'));
+ const ensureReady=B.ensureReady.bind(B);B.ensureReady=async()=>{throw Error('GPU unavailable')};
+ $('generate').click();while(S.busy)await new Promise(r=>setTimeout(r,20));
+ check('Unavailable server keeps photos and clears processing',S.images.length===8&&$('processing').hidden&&$('task-status').classList.contains('error'));
  const sdk=await import('./vendor/gradio-client.js');check('Bundled Gradio SDK loads',typeof sdk.Client.connect==='function'&&typeof sdk.handle_file==='function');
  S.api=sdk;
  const originalFetch=window.fetch;const output='https://unit-test.gradio.live/gradio_api/file=/tmp/cloud.ply';
- $('endpoint').value='https://unit-test.gradio.live';let payload;
+ let payload;B.ensureReady=async()=>({client:S.client,api:S.api,endpoint:'https://unit-test.gradio.live'});
  S.client={submit:(name,input)=>{payload={name,input};return(async function*(){yield{type:'status',stage:'generating',progress_data:[{desc:'Mock GPU inference'}]};yield{type:'data',data:[{url:output},{image_count:8,elapsed_seconds:1.2}]};})();}};
  window.fetch=async(url,...args)=>String(url).startsWith('https://unit-test.gradio.live/')?new Response(plain):originalFetch(url,...args);
  $('generate').click();while(S.busy)await new Promise(r=>setTimeout(r,20));
  check('Reconstruction adapter submits images',payload.name==='/reconstruct'&&payload.input.images.length===8&&payload.input.quality==='fast');
- check('Returned PLY displayed',S.scene==='result'&&$('engine-label').textContent==='Pi3X · Colab GPU'&&$('result-image-count').textContent==='8장');
+ check('Returned PLY displayed',S.scene==='result'&&$('engine-label').textContent==='Pi3X'&&$('result-image-count').textContent==='8장');
  check('No-confidence result disables filter',$('confidence').disabled);
  check('Busy controls recover',!$('generate').disabled&&$('processing').hidden);
  S.client={config:{api_prefix:'/gradio_api'},submit:()=> (async function*(){yield{type:'data',data:[{path:'/tmp/cloud.ply',url:'http://127.0.0.1:7860/gradio_api/file=/tmp/cloud.ply'},{image_count:8}]};})()};
@@ -49,14 +54,14 @@ script=r'''(async()=>{
  S.client={submit:()=> (async function*(){yield {type:'status',stage:'error',message:'GPU 메모리가 부족합니다.'};})()};
  $('generate').click();while(S.busy)await new Promise(r=>setTimeout(r,20));
  check('Inference failure keeps last result',S.scene==='result'&&$('task-status').classList.contains('error')&&!$('generate').disabled);
- window.fetch=originalFetch;S.client=null;$('endpoint').value='';
- for(const image of S.images)URL.revokeObjectURL(image.url);S.images=[];$('image-list').replaceChildren();$('image-count').textContent='0 / 8';$('task-status').textContent='사진을 추가하고 Colab을 연결해주세요.';$('task-status').classList.remove('error');$('toast').hidden=true;
+ window.fetch=originalFetch;S.client=null;B.ensureReady=ensureReady;
+ for(const image of S.images)URL.revokeObjectURL(image.url);S.images=[];$('image-list').replaceChildren();$('image-count').textContent='0 / 8';$('task-status').textContent='사진 2장 이상을 올리면 자동으로 생성을 시작해요.';$('task-status').classList.remove('error');$('toast').hidden=true;
  $('point-size').value=2;$('point-size').dispatchEvent(new Event('input'));T.showDemo();
  return results;
 })()'''
 results=c.js(script)
 for x in results:print(('PASS' if x['pass'] else 'FAIL')+' '+x['name'])
-c.call('Emulation.setDeviceMetricsOverride',{'width':1440,'height':1000,'deviceScaleFactor':1,'mobile':False});c.js('window.spaceTest.state.viewer.fit();new Promise(r=>setTimeout(r,300))');c.screenshot('/home/lee/vivecode/preview-desktop.png')
+c.call('Emulation.setDeviceMetricsOverride',{'width':1440,'height':1000,'deviceScaleFactor':1,'mobile':False});c.js('window.spaceTest.state.viewer.fit();new Promise(r=>setTimeout(r,300))');c.screenshot(str(ROOT/'preview-desktop.png'))
 c.call('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
 c.js('window.spaceTest.state.viewer.fit();new Promise(r=>setTimeout(r,300))')
 mobile=c.js('({viewport:innerWidth,content:document.documentElement.scrollWidth,viewer:document.getElementById("viewer").getBoundingClientRect().width})')
@@ -64,7 +69,7 @@ assert mobile['viewport']==mobile['content'],mobile
 print('PASS mobile horizontal overflow check',mobile)
 r=c.call('Page.getLayoutMetrics');height=r['cssContentSize']['height'];r=c.call('Page.captureScreenshot',{'format':'png','captureBeyondViewport':True,'clip':{'x':0,'y':0,'width':390,'height':height,'scale':1}})
 import base64
-open('/home/lee/vivecode/preview-mobile.png','wb').write(base64.b64decode(r['data']))
+open(ROOT/'preview-mobile.png','wb').write(base64.b64decode(r['data']))
 # Desktop with 200% equivalent responsive width. Ensure no clipping/overflow.
 c.call('Emulation.setDeviceMetricsOverride',{'width':720,'height':500,'deviceScaleFactor':2,'mobile':False})
 assert c.js('document.documentElement.scrollWidth<=innerWidth'),'overflow at 200% equivalent'

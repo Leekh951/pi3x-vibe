@@ -2,5 +2,6 @@
   "githubRepository": "Leekh951/pi3x-vibe",
   "githubRef": "main",
   "notebookPath": "colab/Pi3X_SPACE.ipynb",
+  "colabEndpoint": "https://50dc8700551fa8a482.gradio.live",
   "viewerUrl": "https://leekh951.github.io/pi3x-vibe/"
 }
