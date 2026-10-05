@@ -1,6 +1,7 @@
 // Exercise the shipped SDK against a public API whose preflight omits ACAC.
 import { Client } from '../vendor/gradio-client.js';
-import { Blob } from 'node:buffer';
+import { File } from 'node:buffer';
+import { uploadImages } from '../gpu-upload.mjs';
 
 const originalFetch = globalThis.fetch, originalWindow = globalThis.window;
 const requests = [];
@@ -21,15 +22,16 @@ try {
     if (path === '/gradio_api/info') return Response.json(info);
     if (path === '/gradio_api/upload') {
       if (!(options.body instanceof FormData) || options.body.getAll('files').length !== 1) throw Error('Missing photo upload');
-      return Response.json(['/tmp/upload.png']);
+      if (options.body.getAll('files')[0].name !== 'room.png') throw Error('Image filename/extension was lost');
+      return Response.json(['/tmp/room.png']);
     }
     if (path === '/gradio_api/queue/join') return Response.json({ event_id: 'test-event' });
     if (path === '/gradio_api/queue/data') return new Response('data: {"msg":"heartbeat"}\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
     throw Error('Unexpected request: ' + url);
   };
   client = await Client.connect(endpoint);
-  const uploaded = await client.upload_files(endpoint, [new Blob(['photo'], { type: 'image/png' })]);
-  if (uploaded.files?.[0] !== '/tmp/upload.png') throw Error('Upload did not complete');
+  const uploaded = await uploadImages(client, endpoint, [new File(['photo'], 'room.png', { type: 'image/png' })]);
+  if (uploaded[0].path !== '/tmp/room.png' || uploaded[0].orig_name !== 'room.png' || uploaded[0].mime_type !== 'image/png') throw Error('Upload lost image metadata');
   const [queued, status] = await client.post_data(endpoint + '/gradio_api/queue/join', { data: [], session_hash: 'test' });
   if (status !== 200 || queued.event_id !== 'test-event') throw Error('Queue request did not complete');
   const stream = client.stream(new URL(endpoint + '/gradio_api/queue/data?session_hash=test'));

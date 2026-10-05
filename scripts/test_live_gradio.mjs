@@ -1,11 +1,13 @@
 // Manual verification using the same shipped client and submit API as the page.
 import { File, Blob } from 'node:buffer';
 import { writeFile } from 'node:fs/promises';
+import { uploadImages } from '../gpu-upload.mjs';
+import { watchGPUJob } from '../gpu-job.mjs';
 globalThis.File = File; globalThis.Blob = Blob;
 globalThis.window = { WebSocket: class {}, location: { search: '', hostname: 'leekh951.github.io' } };
 globalThis.window.parent = globalThis.window;
 globalThis.document = {};
-const { Client, handle_file } = await import('../vendor/gradio-client.js');
+const { Client } = await import('../vendor/gradio-client.js');
 const endpoint = 'https://leekh951-pi3x-vibe.hf.space';
 const revision = '9fa3ddb3f8d53041f8b2738df404f62223bbaa7b';
 let client, job, completed = false, timer;
@@ -18,10 +20,11 @@ try {
     if (!response.ok) throw Error('Sample download failed');
     images.push(new File([await response.arrayBuffer()], `${index}.png`, { type: 'image/png' }));
   }
-  job = client.submit('/reconstruct', { images: images.map(handle_file), quality: 'fast' });
+  const uploaded = await uploadImages(client, endpoint, images);
+  job = client.submit('/reconstruct', { images: uploaded, quality: 'fast' });
   const result = (async () => {
     let output;
-    for await (const message of job) {
+    for await (const message of watchGPUJob(job)) {
       console.log(Math.round((Date.now() - started) / 1000) + 's', JSON.stringify(message));
       if (message.type === 'status' && message.stage === 'error') throw Error(message.message || 'GPU request failed');
       if (message.type === 'data') output = message.data;

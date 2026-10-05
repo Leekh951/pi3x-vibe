@@ -30,4 +30,20 @@ const pending = iterator.next(); controller.abort();
 try { await pending; throw Error('Cancellation should stop waiting'); }
 catch (error) { assert(error.name === 'AbortError', 'Visitor cancellation stops a pending next()'); }
 assert(canceled.canceled === 1 && canceled.returned === 1, 'Canceled request is released');
+
+// The SDK's return() can itself remain pending after an error status. Forward
+// the server error without awaiting that broken cleanup iterator indefinitely.
+const failed = { next: async () => ({ done: false, value: { type: 'status', stage: 'error', message: 'Invalid file type' } }),
+  cancel() {}, return: () => new Promise(() => {}) };
+let errorTimer;
+try {
+  const observed = (async () => {
+    for await (const message of watchGPUJob(failed)) {
+      if (message.stage === 'error') throw Error(message.message);
+    }
+  })();
+  await Promise.race([observed, new Promise((_, reject) => { errorTimer = setTimeout(() => reject(Error('Error cleanup hung')), 100); })]);
+  throw Error('Expected the server error');
+} catch (error) { assert(error.message === 'Invalid file type', 'Server error is shown even when SDK return() hangs'); }
+finally { clearTimeout(errorTimer); }
 console.log('GPU start/progress labels, result delivery, stalled stream timeout and visitor cancellation passed.');

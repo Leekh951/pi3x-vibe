@@ -2,6 +2,7 @@ import { makeDemo } from './demo.js';
 import { SpaceViewer } from './viewer.js';
 import { GPUBackend, BackendUnavailable, normalizeEndpoint } from './gpu-backend.mjs';
 import { jobProgress, watchGPUJob } from './gpu-job.mjs';
+import { uploadImages } from './gpu-upload.mjs';
 const $ = id => document.getElementById(id);
 const state = { images: [], quality: 'fast', client: null, api: null, busy: false, viewer: null, scene: 'demo', backendStatus: 'connecting', activeController: null };
 let toastTimer;
@@ -93,7 +94,8 @@ $('generate').onclick=async()=>{
     state.client = connection.client; state.api = connection.api;
     status('사진을 전송하고 있어요.');
     $('processing-label').textContent='사진을 보내는 중';$('processing-detail').textContent='업로드 후 사진 속 공간을 이어줍니다.';
-    const job=state.client.submit('/reconstruct',{images:state.images.map(x=>state.api.handle_file(x.file)),quality:state.quality});
+    const images=await uploadImages(state.client,connection.endpoint,state.images.map(x=>x.file));
+    const job=state.client.submit('/reconstruct',{images,quality:state.quality});
     state.activeController=new AbortController();$('cancel-generation').disabled=false;
     const startedAt=performance.now();
     let progress={phase:'upload',label:'사진을 보내는 중',detail:'업로드 후 사진 속 공간을 이어줍니다.'};

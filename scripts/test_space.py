@@ -43,6 +43,16 @@ class SpacePackageTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 normalize_endpoint(value)
 
+    def test_small_jobs_do_not_reserve_full_gpu_budget(self):
+        app = ast.parse((ROOT / "hosting/huggingface/app.py").read_text())
+        duration = next(node for node in app.body if isinstance(node, ast.FunctionDef) and node.name == "gpu_duration")
+        namespace = {}
+        exec(compile(ast.Module(body=[duration], type_ignores=[]), "gpu_duration", "exec"), namespace)
+        estimate = namespace["gpu_duration"]
+        self.assertEqual(estimate(["photo"] * 3, "fast"), 45)
+        self.assertLess(estimate(["photo"] * 3, "detail"), 120)
+        self.assertLessEqual(estimate(["photo"] * 8, "detail"), 90)
+
 
 if __name__ == "__main__":
     unittest.main()
