@@ -43,46 +43,33 @@ def exercise(endpoint, destination):
         paths = json.load(response)
     assert len(paths) == 3, paths
     input_data = [[{"path": path, "meta": {"_type": "gradio.FileData"}} for path in paths], "fast"]
-    payload = {"data": input_data}
-    with request(prefix + "/call/reconstruct", json.dumps(payload).encode(), {"Content-Type": "application/json"}) as response:
+    # Use the normal queue transport once. It exposes GPU/quota errors directly
+    # without spending another ZeroGPU request on a diagnostic retry.
+    session = uuid.uuid4().hex
+    dependency = next(item for item in config["dependencies"] if item.get("api_name") == "reconstruct")
+    payload = {"data": input_data, "fn_index": dependency["id"], "session_hash": session}
+    with request(prefix + "/queue/join", json.dumps(payload).encode(), {"Content-Type": "application/json"}) as response:
         event_id = json.load(response)["event_id"]
     print("GPU reconstruction requested:", event_id, flush=True)
     output = None
-    event = ""
-    with request(prefix + "/call/reconstruct/" + event_id) as response:
+    with request(prefix + "/queue/data?session_hash=" + session) as response:
         for raw in response:
+            if time.monotonic() - started > 600:
+                raise TimeoutError("GPU queue/inference did not complete within ten minutes")
             line = raw.decode().strip()
-            if line.startswith("event:"):
-                event = line.split(":", 1)[1].strip()
-            elif line.startswith("data:"):
-                data = json.loads(line.split(":", 1)[1].strip())
-                if event == "error":
-                    # The simple call endpoint can hide Python error messages.
-                    # Read the normal Gradio queue transport to surface the cause.
-                    session = uuid.uuid4().hex
-                    dependency = next(item for item in config["dependencies"] if item.get("api_name") == "reconstruct")
-                    queued = {"data": input_data, "fn_index": dependency["id"], "session_hash": session}
-                    with request(prefix + "/queue/join", json.dumps(queued).encode(), {"Content-Type": "application/json"}) as queued_response:
-                        print("Queue diagnostic:", json.load(queued_response), flush=True)
-                    with request(prefix + "/queue/data?session_hash=" + session) as queue:
-                        for queue_raw in queue:
-                            queue_line = queue_raw.decode().strip()
-                            if not queue_line.startswith("data:"):
-                                continue
-                            message = json.loads(queue_line.split(":", 1)[1].strip())
-                            print("Queue status:", json.dumps(message, ensure_ascii=False), flush=True)
-                            if message.get("msg") == "process_completed":
-                                if not message.get("success"):
-                                    raise RuntimeError(f"GPU inference failed: {message.get('output')}")
-                                output = message["output"]["data"]
-                                break
-                    if not output:
-                        raise RuntimeError(f"GPU inference failed: {data}")
-                    break
-                if event == "complete":
-                    output = data
-                    break
-                print(f"GPU {event}: {round(time.monotonic() - started)} seconds", flush=True)
+            if not line.startswith("data:"):
+                continue
+            message = json.loads(line.split(":", 1)[1].strip())
+            stage = message.get("msg")
+            if stage == "process_completed":
+                if not message.get("success"):
+                    raise RuntimeError(f"GPU inference failed: {message.get('output')}")
+                output = message["output"]["data"]
+                break
+            if stage in {"queue_full", "unexpected_error", "server_stopped"}:
+                raise RuntimeError(f"GPU queue failed: {message}")
+            if stage != "heartbeat":
+                print("GPU queue:", json.dumps(message, ensure_ascii=False), flush=True)
     assert output and output[0].get("path"), output
     with request(prefix + "/file=" + quote(output[0]["path"], safe="")) as response:
         ply = response.read()
@@ -93,9 +80,16 @@ def exercise(endpoint, destination):
     assert count > 0
     # Backend records: XYZ float32, RGB uint8, confidence float32 (19 bytes).
     assert len(ply) - split == count * 19, (len(ply), count)
-    for index in range(min(count, 1000)):
+    low, high = [math.inf] * 3, [-math.inf] * 3
+    for index in range(count):
         x, y, z, red, green, blue, confidence = struct.unpack_from("<fffBBBf", ply, split + index * 19)
         assert all(math.isfinite(value) for value in (x, y, z, confidence))
+        assert 0 <= confidence <= 1
+        for axis, value in enumerate((x, y, z)):
+            low[axis], high[axis] = min(low[axis], value), max(high[axis], value)
+    assert any(high[axis] - low[axis] > 1e-6 for axis in range(3)), "Degenerate point cloud"
+    assert output[1]["engine"] == "Pi3X"
+    assert output[1]["image_count"] == 3 and output[1]["point_count"] == count
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(ply)

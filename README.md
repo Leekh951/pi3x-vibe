@@ -4,6 +4,8 @@
 
 웹 사이트: **https://leekh951.github.io/pi3x-vibe/**
 
+현재 GPU 서버: **https://huggingface.co/spaces/leekh951/pi3x-vibe** (ZeroGPU). 기본 웹 화면은 이 서버에 자동 연결하며 Colab 실행이 필요 없습니다. 2026-10-05 공식 샘플 사진 3장, `fast`로 실제 GPU 추론을 확인했습니다: 250,405개 점, 3.3초(서버 추론 시간, 업로드·대기 시간 제외), 4,757,956바이트 PLY. 모든 점의 좌표·신뢰도가 유한하고 점 개수가 메타데이터와 일치하는 것을 확인했습니다.
+
 ## 방문자 사용법
 
 1. 같은 공간을 다른 각도에서 찍은 JPG·PNG·WEBP 사진 2–8장을 선택하거나 놓습니다.
@@ -14,7 +16,7 @@
 
 ## 운영자: 고정 주소 GPU 서버 (Hugging Face Spaces)
 
-Colab을 수동으로 다시 켜지 않으려면 GPU 백엔드를 Hugging Face Spaces에 배포합니다. 웹 화면은 기존 GitHub Pages를 사용하고 서버 주소만 바뀝니다. 아래 파일은 **배포 준비 단계**이며, 실제 Space 생성·GPU 추론 검증은 아직 완료하지 않았습니다.
+GPU 백엔드는 Hugging Face Spaces에 배포되어 있습니다. 웹 화면은 기존 GitHub Pages를 사용합니다. 아래 절차는 서버를 새로 만들거나 다른 계정에 배포할 때 사용합니다.
 
 ```bash
 python3 scripts/build_space.py
@@ -84,11 +86,13 @@ python3 scripts/test_pages.py
 python3 scripts/build_pages.py
 ```
 
-기존 Node가 있는 환경에서는 `node scripts/test_backend.mjs`로 자동 연결을 검증합니다. 로컬 Node가 없으면 설치하지 않아도 되며 GitHub Actions가 이 검증을 실행합니다. `dist/`는 Git에서 제외합니다.
+기존 Node가 있는 환경에서는 `node scripts/test_backend.mjs`로 자동 연결을 검증합니다. `node --experimental-default-type=module scripts/test_gradio_transport.mjs`는 실제 배포 SDK의 공개 API 연결·사진 전송·대기열·진행 스트림을 모사 서버로 검증합니다. 로컬 Node가 없으면 설치하지 않아도 되며 GitHub Actions가 이 검증을 실행합니다. `dist/`는 Git에서 제외합니다.
 
 `python3 scripts/test_space.py`는 업로드 패키지와 GPU 서버 주소 검증을 확인합니다. 배포 검증과 자동 연결 검증으로 경로·필수 파일, 방문자 화면의 설정 제거, 서버 주소 갱신, 중복 연결 방지, 연결 실패·시간 초과·재시도, Space 시작 대기를 확인합니다. 자동 연결 테스트는 모사 API이며 실제 모델 추론을 대신하지 않습니다.
 
-이전 화면은 Chrome에서 WebGL·PLY 입출력·사진 검증을 확인했습니다. 실제 Colab 호출에서는 이전 실행 코드의 모델 초기화 오류를 확인했고, CPU 초기화로 수정했습니다. **수정된 코드의 실제 GPU 추론과 Space 배포는 아직 검증하지 않았습니다.** 새 자동 생성 화면의 브라우저 조작도 추가 검증이 필요합니다.
+이전 화면은 Chrome에서 WebGL·PLY 입출력·사진 검증을 확인했습니다. 이전 Colab 실행 코드의 모델 초기화 오류를 CPU 초기화로 수정했고, 수정된 코드의 **실제 ZeroGPU 추론·PLY 다운로드·전체 점 데이터 검증을 완료했습니다.** GitHub Pages 출처의 CORS 응답과 사전 요청도 확인했습니다. 새 자동 생성 화면의 실제 브라우저 조작은 아직 추가 검증이 필요합니다.
+
+Hugging Face 프록시의 OPTIONS 응답에 `Access-Control-Allow-Credentials`가 없어, 공개 API 요청은 쿠키를 보내지 않습니다. `vendor/gradio-client.js`의 8개 `credentials` 설정을 `omit`으로 바꾸었고 파일 상단에 수정 사실을 표시했습니다. 로그인 쿠키가 필요한 비공개 서버는 지원하지 않습니다.
 
 ## 주요 파일
 

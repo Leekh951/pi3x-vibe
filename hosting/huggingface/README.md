@@ -39,4 +39,6 @@ Source: https://github.com/yyfz/Pi3 (BSD-3-Clause). We use image-only inference
 with the pinned source and weights revisions; no xFormers or flash-attn build.
 
 Deployment package source: https://github.com/Leekh951/pi3x-vibe .
-This package has not yet been validated with actual inference on a live Space.
+Live ZeroGPU inference verified on 2026-10-05 at leekh951/pi3x-vibe: three
+official room photos, fast quality, 250,405 finite points, 3.3 seconds of
+inference (excluding upload/queue time). This example is not a latency guarantee.
