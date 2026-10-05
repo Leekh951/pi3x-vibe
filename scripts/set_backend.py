@@ -1,4 +1,4 @@
-"""Register the operator's running Colab server without installing anything."""
+"""Register a running Colab or Hugging Face GPU server without local installs."""
 import argparse
 import json
 import re
@@ -11,9 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def normalize_endpoint(value):
     url = urlsplit(value.strip())
-    if (url.scheme != "https" or not re.fullmatch(r"[a-z0-9-]+\.gradio\.live", url.hostname or "", re.I)
+    if (url.scheme != "https" or not re.fullmatch(r"[a-z0-9-]+\.(?:gradio\.live|hf\.space)", url.hostname or "", re.I)
             or url.username or url.password or url.port):
-        raise ValueError("Colab에서 출력된 https://…gradio.live 주소를 입력하세요.")
+        raise ValueError("https://…gradio.live 또는 https://…hf.space 서버 주소를 입력하세요.")
     return f"https://{url.hostname}"
 
 
@@ -37,6 +37,6 @@ def set_backend(value):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("endpoint", help="Colab의 gradio.live 주소")
+    parser.add_argument("endpoint", help="GPU 서버의 gradio.live 또는 hf.space 주소")
     args = parser.parse_args()
     set_backend(args.endpoint)

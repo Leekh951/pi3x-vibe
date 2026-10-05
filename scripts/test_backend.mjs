@@ -10,8 +10,10 @@ let checks = 0;
 function check(condition, message) { assert(condition, message); checks++; }
 
 check(normalizeEndpoint(endpoint + '/') === endpoint, 'Normalize HTTPS endpoint');
+check(normalizeEndpoint('https://leekh951-pi3x-vibe.hf.space/') === 'https://leekh951-pi3x-vibe.hf.space', 'Accept stable Space address');
 for (const value of ['javascript:alert(1)', 'http://space-test.gradio.live', 'https://evil.example',
-  'https://space-test.gradio.live.evil.example', 'https://user:password@space-test.gradio.live', 'https://space-test.gradio.live:8080']) {
+  'https://space-test.gradio.live.evil.example', 'https://user:password@space-test.gradio.live', 'https://space-test.gradio.live:8080',
+  'http://test.hf.space', 'https://test.hf.space.evil.example', 'https://user:secret@test.hf.space', 'https://test.hf.space:8443']) {
   let rejected = false;
   try { normalizeEndpoint(value); } catch { rejected = true; }
   check(rejected, `Reject invalid endpoint: ${value}`);
@@ -75,4 +77,24 @@ session.useSessionEndpoint(endpoint);
 await session.ensureReady();
 check(session.endpoint === endpoint, 'Owner return link tests a session without exposing setup to visitors');
 session.invalidate();
+
+let wakeAttempts = 0;
+const waking = new GPUBackend({ retryDelay: 1, fetchConfig: async () => ({ colabEndpoint: 'https://test.hf.space' }),
+  loadClient: async () => ({ Client: { connect: async () => {
+    if (++wakeAttempts < 3) throw Error('Space is starting');
+    return { close() {}, view_api: async () => ({ named_endpoints: { '/reconstruct': {} } }) };
+  } } }) });
+const wakeFirst = waking.ensureReady(), wakeSame = waking.ensureReady();
+await wakeFirst;
+check(wakeFirst === wakeSame && wakeAttempts === 3 && waking.client, 'Wait for a sleeping Space without duplicate connections');
+waking.invalidate();
+
+let unavailableAttempts = 0;
+const unavailableSpace = new GPUBackend({ spaceTimeout: 12, retryDelay: 1,
+  fetchConfig: async () => ({ colabEndpoint: 'https://test.hf.space' }),
+  loadClient: async () => ({ Client: { connect: async () => { unavailableAttempts++; throw Error('Space offline'); } } }) });
+await mustFail(() => unavailableSpace.ensureReady());
+const stoppedAttempts = unavailableAttempts;
+await new Promise(resolve => setTimeout(resolve, 8));
+check(stoppedAttempts > 1 && unavailableAttempts === stoppedAttempts && !unavailableSpace.pending, 'Space retries stop at the deadline');
 console.log(`${checks} automatic GPU connection checks passed (simulated API, no actual inference).`);

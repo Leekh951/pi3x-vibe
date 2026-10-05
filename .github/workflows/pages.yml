@@ -25,6 +25,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate Pages files
         run: python3 scripts/test_pages.py
+      - name: Validate GPU deployment package
+        run: python3 scripts/test_space.py
       - name: Validate automatic GPU connection
         run: node scripts/test_backend.mjs
       - name: Check browser script syntax

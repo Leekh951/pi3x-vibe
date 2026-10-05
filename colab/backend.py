@@ -1,4 +1,4 @@
-"""Pi3X SPACE GPU backend. Run in Google Colab, never on the local viewer server.
+"""Pi3X SPACE GPU backend for Colab and Hugging Face Spaces.
 
 Model source: https://github.com/yyfz/Pi3
 Weights: https://huggingface.co/yyfz233/Pi3X (CC BY-NC 4.0).
@@ -28,15 +28,17 @@ from pi3.utils.geometry import depth_normal_edge
 
 WEIGHTS_REVISION = "bb1deea4d7423de5b30691739cb451a3f57dc1d5"
 PIXEL_LIMITS = {"fast": 90000, "detail": 230000}
-OUTPUT_ROOT = Path("/content/SPACE_results")
+OUTPUT_ROOT = Path(os.environ.get("SPACE_OUTPUT_ROOT", str(Path(tempfile.gettempdir()) / "SPACE_results")))
 OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 MODEL = None
 
 
-def load_model(progress):
+def load_model(progress=None):
     global MODEL
     if MODEL is not None:
         return MODEL
+    if progress is None:
+        progress = lambda value, desc: print(desc, flush=True)
     progress(.10, desc="Pi3X 모델을 내려받고 있어요. 첫 실행은 몇 분 걸릴 수 있어요.")
     checkpoint = hf_hub_download(
         repo_id="yyfz233/Pi3X", filename="model.safetensors", revision=WEIGHTS_REVISION
@@ -124,7 +126,7 @@ def clean_old_results():
 
 def reconstruct(images, quality, progress=gr.Progress()):
     if not torch.cuda.is_available():
-        raise gr.Error("Colab에서 런타임 → 런타임 유형 변경 → T4 GPU를 선택해주세요.")
+        raise gr.Error("GPU 서버를 준비하지 못했어요. 잠시 후 다시 시도해주세요.")
     if not images or not 2 <= len(images) <= 8:
         raise gr.Error("같은 공간의 사진 2–8장을 선택해주세요.")
     if quality not in PIXEL_LIMITS:
@@ -181,20 +183,26 @@ def viewer_connection_url(viewer_url, public_url):
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
-def launch(viewer_url="http://localhost:8000/"):
-    if not torch.cuda.is_available():
-        raise RuntimeError("GPU가 연결되지 않았습니다. 런타임 유형을 T4 GPU로 변경하고 다시 실행하세요.")
-    with gr.Blocks(title="Pi3X SPACE · Colab GPU") as demo:
-        gr.Markdown("# π³ SPACE · 운영자 GPU 서버\n이 탭을 유지하고 공개 주소를 사이트 설정의 colabEndpoint에 등록하세요. 방문자는 사진만 올리면 됩니다.\n"
-                    "사진은 이 Colab 런타임에서 처리됩니다. 모델 가중치는 비상업 연구·교육용입니다.")
+def build_demo(inference=reconstruct):
+    """Both hosts expose the same named API and PLY/JSON output contract."""
+    with gr.Blocks(title="Pi3X SPACE · GPU") as demo:
+        gr.Markdown("# π³ SPACE · GPU 서버\n같은 공간의 사진을 올리면 3D 점 구름을 만듭니다.\n"
+                    "사진은 이 서버에서 처리됩니다. 모델 가중치는 비상업 연구·교육용입니다.")
         images = gr.File(label="같은 공간의 사진 2–8장", file_count="multiple", type="filepath", file_types=["image"])
         quality = gr.Radio(choices=[("가볍게", "fast"), ("섬세하게", "detail")], value="fast", label="품질")
         run = gr.Button("3D 공간 만들기")
         output = gr.File(label="PLY 결과")
         metadata = gr.JSON(label="재구성 정보")
-        run.click(reconstruct, inputs=[images, quality], outputs=[output, metadata],
+        run.click(inference, inputs=[images, quality], outputs=[output, metadata],
                   api_name="reconstruct", concurrency_limit=1)
     demo.queue(max_size=4, default_concurrency_limit=1)
+    return demo
+
+
+def launch(viewer_url="http://localhost:8000/"):
+    if not torch.cuda.is_available():
+        raise RuntimeError("GPU가 연결되지 않았습니다. 런타임 유형을 T4 GPU로 변경하고 다시 실행하세요.")
+    demo = build_demo()
     _, _, public_url = demo.launch(share=True, debug=False, show_error=True, max_file_size="15mb")
     print("\n" + "=" * 50)
     print("SPACE 웹 화면에 붙여넣을 주소:", public_url)
