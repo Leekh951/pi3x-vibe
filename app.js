@@ -21,7 +21,7 @@ function syncOrientation() {
 function showDemo() {
   if (state.busy || !state.viewer) return;
   state.viewer.setData(makeDemo()); state.scene='demo';
-  $('scene-title').textContent='작은 거실, 큰 가능성';
+  $('scene-title').textContent='3D 시각화 공간';
   $('scene-tag').innerHTML='<span></span>INTERACTIVE DEMO';
   $('scene-caption-title').textContent='The quiet corner';
   $('scene-description').textContent='직접 회전하고, 가까이 들여다보세요.';
