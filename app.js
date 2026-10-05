@@ -1,8 +1,9 @@
 import { makeDemo } from './demo.js';
 import { SpaceViewer } from './viewer.js';
 import { GPUBackend, BackendUnavailable, normalizeEndpoint } from './gpu-backend.mjs';
+import { jobProgress, watchGPUJob } from './gpu-job.mjs';
 const $ = id => document.getElementById(id);
-const state = { images: [], quality: 'fast', client: null, api: null, busy: false, viewer: null, scene: 'demo', backendStatus: 'connecting' };
+const state = { images: [], quality: 'fast', client: null, api: null, busy: false, viewer: null, scene: 'demo', backendStatus: 'connecting', activeController: null };
 let toastTimer;
 function toast(message) { $('toast').textContent=message; $('toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,5500); }
 function status(message,error=false) { $('task-status').textContent=message; $('task-status').classList.toggle('error',error); }
@@ -76,7 +77,9 @@ function setBusy(busy) {
   for(const id of ['generate','dropzone','demo-button','import-button','export'])$(id).disabled=busy;
   document.querySelectorAll('[data-quality],.remove-image').forEach(b=>b.disabled=busy);
   $('generate').querySelector('span').textContent=busy?'공간을 만드는 중…':'3D 공간 만들기';
+  $('cancel-generation').disabled=!busy || !state.activeController;
 }
+$('cancel-generation').onclick=()=>state.activeController?.abort();
 $('generate').onclick=async()=>{
   clearTimeout(autoGenerateTimer);
   if(state.busy)return;
@@ -84,22 +87,32 @@ $('generate').onclick=async()=>{
   if(state.images.length<2){toast('같은 공간의 사진을 2장 이상 추가해주세요.');$('dropzone').focus();return;}
   setBusy(true);status('사진을 처리할 준비를 하고 있어요.');
   $('processing-label').textContent='공간 만들기를 준비하는 중';$('processing-detail').textContent='잠시만 기다려주세요.';
+  let elapsedTimer;
   try {
     const connection = await backend.ensureReady();
     state.client = connection.client; state.api = connection.api;
     status('사진을 전송하고 있어요.');
     $('processing-label').textContent='사진을 보내는 중';$('processing-detail').textContent='업로드 후 사진 속 공간을 이어줍니다.';
     const job=state.client.submit('/reconstruct',{images:state.images.map(x=>state.api.handle_file(x.file)),quality:state.quality});
+    state.activeController=new AbortController();$('cancel-generation').disabled=false;
+    const startedAt=performance.now();
+    let progress={phase:'upload',label:'사진을 보내는 중',detail:'업로드 후 사진 속 공간을 이어줍니다.'};
+    const updateProgress=()=>{
+      const seconds=Math.floor((performance.now()-startedAt)/1000);
+      $('processing-label').textContent=progress.label;
+      $('processing-detail').textContent=progress.detail+` · ${seconds}초 경과`;
+    };
+    elapsedTimer=setInterval(updateProgress,1000);
     let output;
-    for await(const message of job) {
+    for await(const message of watchGPUJob(job,{signal:state.activeController.signal})) {
       if(message.type==='data')output=message.data;
       if(message.type==='status') {
         if(message.stage==='error')throw Error(message.message||'공간을 만들지 못했어요. 다시 시도해주세요.');
-        $('processing-label').textContent=message.stage==='pending'?'GPU 순서를 기다리는 중':'공간을 이어주는 중';
-        const desc=message.progress_data?.find(p=>p.desc)?.desc;
-        $('processing-detail').textContent=desc || (message.stage==='pending'&&message.position!=null?`대기 순서 ${message.position+1}번째`:'첫 실행은 모델을 불러오는 데 시간이 걸릴 수 있어요.');
+        progress=jobProgress(message,progress);updateProgress();
       }
     }
+    clearInterval(elapsedTimer);
+    state.activeController=null;$('cancel-generation').disabled=true;
     const file=output?.[0];
     if(!file?.url&&!file?.path)throw Error('결과를 받지 못했어요. 다시 시도해주세요.');
     $('processing-label').textContent='나만의 공간을 열고 있어요';
@@ -121,11 +134,11 @@ $('generate').onclick=async()=>{
     $('confidence').disabled=!result.hasConfidence;$('confidence-hint').textContent=result.hasConfidence?'신뢰도가 낮은 점을 숨겨요.':'이 파일에는 신뢰도 정보가 없어요.';
     setView();status(`완성됐어요${meta.elapsed_seconds?` · ${meta.elapsed_seconds}초`:''}. 회전하며 공간을 살펴보세요.`);toast('나만의 3D 공간이 완성됐어요.');
   }catch(e){
-    const message=e instanceof BackendUnavailable ? e.message : '공간을 만들지 못했어요. 사진 수를 줄이거나 다른 사진으로 다시 시도해주세요.';
+    const message=e instanceof BackendUnavailable || ['AbortError','TimeoutError'].includes(e.name) ? e.message : /quota|daily.*GPU|GPU.*budget/i.test(e.message||'') ? '무료 GPU 사용량이 부족해요. 사용량이 초기화된 뒤 다시 시도해주세요.' : '공간을 만들지 못했어요. 사진 수를 줄이거나 다른 사진으로 다시 시도해주세요.';
     status(message,true);toast(message);state.client=null;backend.invalidate();
     console.warn('Reconstruction:',e.message);
   }
-  finally{setBusy(false);}
+  finally{clearInterval(elapsedTimer);state.activeController=null;setBusy(false);}
 };
 $('demo-button').onclick=()=>{showDemo();toast('합성 예제 장면이에요. 드래그해 공간을 탐색해보세요.');};
 $('view-top').onclick=()=>setView(true);$('view-perspective').onclick=()=>setView();$('reset-view').onclick=()=>setView();

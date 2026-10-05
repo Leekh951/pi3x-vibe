@@ -14,6 +14,8 @@
 
 첫 화면의 거실은 **합성 예제**입니다. 실제 사진 결과는 서버에서 반환한 PLY를 받은 뒤 표시합니다. 서버가 준비되지 않은 경우 그 상태를 안내하고 사진과 이전 결과를 유지합니다. 결과는 색이 있는 점 구름이며 정밀 치수 측정이나 메시 생성은 제공하지 않습니다.
 
+처리 화면은 서버 대기 순서, GPU 준비, 실제 Pi3X 진행을 구분하고 경과 시간을 표시합니다. Gradio의 `process_starts`는 `pending` 상태여도 서버 처리가 시작된 것으로 다룹니다. 대기가 길면 **대기 취소**를 누를 수 있으며, 5분 안에 완료되지 않는 요청도 대기를 끝내고 사진을 유지합니다. 화면의 서버 대기 순서는 ZeroGPU 전체의 GPU 배정 순서를 뜻하지 않습니다.
+
 ## 운영자: 고정 주소 GPU 서버 (Hugging Face Spaces)
 
 GPU 백엔드는 Hugging Face Spaces에 배포되어 있습니다. 웹 화면은 기존 GitHub Pages를 사용합니다. 아래 절차는 서버를 새로 만들거나 다른 계정에 배포할 때 사용합니다.
@@ -89,6 +91,8 @@ python3 scripts/build_pages.py
 기존 Node가 있는 환경에서는 `node scripts/test_backend.mjs`로 자동 연결을 검증합니다. `node --experimental-default-type=module scripts/test_gradio_transport.mjs`는 실제 배포 SDK의 공개 API 연결·사진 전송·대기열·진행 스트림을 모사 서버로 검증합니다. 로컬 Node가 없으면 설치하지 않아도 되며 GitHub Actions가 이 검증을 실행합니다. `dist/`는 Git에서 제외합니다.
 
 `python3 scripts/test_space.py`는 업로드 패키지와 GPU 서버 주소 검증을 확인합니다. 배포 검증과 자동 연결 검증으로 경로·필수 파일, 방문자 화면의 설정 제거, 서버 주소 갱신, 중복 연결 방지, 연결 실패·시간 초과·재시도, Space 시작 대기를 확인합니다. 자동 연결 테스트는 모사 API이며 실제 모델 추론을 대신하지 않습니다.
+
+`node scripts/test_gpu_job.mjs`는 실제 처리 시작을 대기 순서로 잘못 표시하던 회귀, 진행 상태, 멈춘 요청 시간 초과와 사용자 취소를 확인합니다. GitHub Actions의 **Verify live Pi3X client**는 수동으로 실행할 때만 배포된 JavaScript SDK로 공식 사진 3장을 처리합니다. 실제 GPU를 사용하므로 일반 푸시 검증에서는 실행하지 않습니다.
 
 이전 화면은 Chrome에서 WebGL·PLY 입출력·사진 검증을 확인했습니다. 이전 Colab 실행 코드의 모델 초기화 오류를 CPU 초기화로 수정했고, 수정된 코드의 **실제 ZeroGPU 추론·PLY 다운로드·전체 점 데이터 검증을 완료했습니다.** GitHub Pages 출처의 CORS 응답과 사전 요청도 확인했습니다. 새 자동 생성 화면의 실제 브라우저 조작은 아직 추가 검증이 필요합니다.
 

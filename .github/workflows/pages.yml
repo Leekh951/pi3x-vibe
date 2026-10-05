@@ -29,6 +29,8 @@ jobs:
         run: python3 scripts/test_space.py
       - name: Validate automatic GPU connection
         run: node scripts/test_backend.mjs
+      - name: Validate GPU progress and cancellation
+        run: node scripts/test_gpu_job.mjs
       - name: Validate public GPU browser transport
         run: node --experimental-default-type=module scripts/test_gradio_transport.mjs
       - name: Check browser script syntax

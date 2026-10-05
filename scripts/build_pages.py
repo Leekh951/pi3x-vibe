@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE_FILES = (
-    "index.html", "styles.css", "app.js", "gpu-backend.mjs", "viewer.js", "demo.js",
+    "index.html", "styles.css", "app.js", "gpu-backend.mjs", "gpu-job.mjs", "viewer.js", "demo.js",
     ".nojekyll", "colab/Pi3X_SPACE.ipynb",
 )
 

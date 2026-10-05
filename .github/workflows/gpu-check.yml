@@ -1,0 +1,13 @@
+name: Verify live Pi3X client
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shipped client with three official photos
+        run: node --experimental-default-type=module scripts/test_live_gradio.mjs
