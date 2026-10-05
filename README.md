@@ -1,4 +1,4 @@
-# π³ SPACE
+# π³ SPACE · pi3x-vibe
 
 사진 몇 장을 Google Colab의 Pi3X로 재구성하고, 브라우저에서 3D 점 구름을 탐색하는 수업 과제용 웹 앱입니다. 로컬에는 패키지를 설치하지 않습니다. HTML, CSS, JavaScript와 기존 Python만 사용합니다.
 
