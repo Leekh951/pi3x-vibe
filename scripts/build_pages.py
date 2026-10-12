@@ -43,6 +43,7 @@ def build(output, repository=None, viewer_url=None, ref=None):
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / name, destination)
     shutil.copytree(ROOT / "vendor", output / "vendor", dirs_exist_ok=True)
+    shutil.copytree(ROOT / "examples", output / "examples", dirs_exist_ok=True)
     (output / "space.config.json").write_text(
         json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )

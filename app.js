@@ -4,7 +4,7 @@ import { GPUBackend, BackendUnavailable, normalizeEndpoint } from './gpu-backend
 import { jobProgress, watchGPUJob } from './gpu-job.mjs';
 import { uploadImages } from './gpu-upload.mjs';
 const $ = id => document.getElementById(id);
-const state = { images: [], quality: 'fast', client: null, api: null, busy: false, viewer: null, scene: 'demo', backendStatus: 'connecting', activeController: null };
+const state = { images: [], quality: 'fast', client: null, api: null, busy: false, viewer: null, scene: 'demo', backendStatus: 'connecting', activeController: null, examplesLoading: false, manualGeneration: false };
 let toastTimer;
 function toast(message) { $('toast').textContent=message; $('toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,5500); }
 function status(message,error=false) { $('task-status').textContent=message; $('task-status').classList.toggle('error',error); }
@@ -39,7 +39,7 @@ function renderImages() {
     remove.onclick=()=>{URL.revokeObjectURL(entry.url);state.images.splice(index,1);renderImages();};
     card.append(img,number,remove);$('image-list').append(card);
   });
-  if(!state.busy)status(state.images.length<2 ? '같은 공간의 사진을 2장 이상 추가해주세요.' : state.backendStatus === 'ready' ? '준비됐어요. 나만의 공간을 만들어보세요.' : state.backendStatus === 'connecting' ? '사진이 준비됐어요. 서버에 연결하고 있어요.' : '사진이 준비됐어요. 서버 준비 후 다시 시도해주세요.');
+  if(!state.busy)status(state.images.length<2 ? '같은 공간의 사진을 2장 이상 추가해주세요.' : state.manualGeneration ? '예시 사진이 준비됐어요. ‘3D 공간 만들기’를 눌러주세요.' : state.backendStatus === 'ready' ? '준비됐어요. 나만의 공간을 만들어보세요.' : state.backendStatus === 'connecting' ? '사진이 준비됐어요. 서버에 연결하고 있어요.' : '사진이 준비됐어요. 서버 준비 후 다시 시도해주세요.');
 }
 async function addImages(files) {
   if(state.busy)return;
@@ -60,10 +60,48 @@ async function addImages(files) {
 $('dropzone').onclick=()=>$('image-input').click();
 let autoGenerateTimer;
 function scheduleGeneration(previousCount) {
-  if(state.busy || state.images.length<2 || state.images.length===previousCount)return;
+  if(state.busy || state.examplesLoading || state.images.length<2 || state.images.length===previousCount)return;
+  state.manualGeneration=false;
   clearTimeout(autoGenerateTimer);
   autoGenerateTimer=setTimeout(()=>{if(!state.busy&&state.images.length>=2)$('generate').click();},400);
 }
+$('image-example').onclick=async()=>{
+  if(state.busy||state.examplesLoading)return;
+  clearTimeout(autoGenerateTimer);
+  state.examplesLoading=true;$('image-example').disabled=true;$('generate').disabled=true;
+  $('image-example').querySelector('span').textContent='사진 불러오는 중…';
+  try {
+    const manifestURL=new URL('./examples/images.json',import.meta.url);
+    const response=await fetch(manifestURL);
+    if(!response.ok)throw Error('예시 사진 목록을 불러오지 못했어요.');
+    const paths=await response.json();
+    if(!Array.isArray(paths)||paths.length!==3)throw Error('예시 사진 3장이 아직 등록되지 않았어요.');
+    const files=await Promise.all(paths.map(async path=>{
+      if(typeof path!=='string')throw Error('예시 사진 목록을 확인해주세요.');
+      const url=new URL(path,manifestURL);
+      if(url.origin!==manifestURL.origin)throw Error('예시 사진 주소를 확인해주세요.');
+      const result=await fetch(url);
+      if(!result.ok)throw Error('예시 사진을 불러오지 못했어요.');
+      const blob=await result.blob();
+      if(!['image/jpeg','image/png','image/webp'].includes(blob.type)||blob.size>15*1024*1024)throw Error('예시 사진 형식을 확인해주세요.');
+      const file=new File([blob],decodeURIComponent(url.pathname.split('/').pop()),{type:blob.type,lastModified:0});
+      const preview=URL.createObjectURL(file);
+      try {const image=new Image();image.src=preview;await image.decode();if(image.width<28||image.height<28)throw Error();}
+      catch {throw Error('읽을 수 없는 예시 사진이 있어요.');}
+      finally {URL.revokeObjectURL(preview);}
+      return file;
+    }));
+    clearTimeout(autoGenerateTimer);
+    for(const image of state.images)URL.revokeObjectURL(image.url);
+    state.images=[];state.manualGeneration=true;
+    await addImages(files);
+    toast('예시 사진 3장을 넣었어요. ‘3D 공간 만들기’를 누르면 시작해요.');
+  }catch(error){toast(error.message||'예시 사진을 불러오지 못했어요.');}
+  finally {
+    state.examplesLoading=false;$('image-example').disabled=state.busy;$('generate').disabled=state.busy;
+    $('image-example').querySelector('span').textContent='이미지 예시';
+  }
+};
 $('image-input').onchange=async e=>{const before=state.images.length;await addImages(e.target.files);e.target.value='';scheduleGeneration(before);};
 for(const event of ['dragenter','dragover'])$('dropzone').addEventListener(event,e=>{e.preventDefault();if(!state.busy)$('dropzone').classList.add('dragover');});
 for(const event of ['dragleave','drop'])$('dropzone').addEventListener(event,e=>{e.preventDefault();$('dropzone').classList.remove('dragover');if(event==='drop'){const before=state.images.length;addImages(e.dataTransfer.files).then(()=>scheduleGeneration(before));}});
@@ -84,7 +122,7 @@ const backend = new GPUBackend({onStatus: phase => {
 }});
 function setBusy(busy) {
   state.busy=busy;$('processing').hidden=!busy;
-  for(const id of ['generate','dropzone','demo-button','import-button','export','auto-level','original-orientation','orientation-roll','orientation-pitch'])$(id).disabled=busy;
+  for(const id of ['generate','dropzone','image-example','demo-button','import-button','export','auto-level','original-orientation','orientation-roll','orientation-pitch'])$(id).disabled=busy;
   document.querySelectorAll('[data-quality],.remove-image').forEach(b=>b.disabled=busy);
   $('generate').querySelector('span').textContent=busy?'공간을 만드는 중…':'3D 공간 만들기';
   $('cancel-generation').disabled=!busy || !state.activeController;
@@ -92,7 +130,7 @@ function setBusy(busy) {
 $('cancel-generation').onclick=()=>state.activeController?.abort();
 $('generate').onclick=async()=>{
   clearTimeout(autoGenerateTimer);
-  if(state.busy)return;
+  if(state.busy||state.examplesLoading)return;
   if(!state.viewer){toast('3D 뷰어를 사용할 수 없어요. WebGL을 지원하는 브라우저에서 열어주세요.');return;}
   if(state.images.length<2){toast('같은 공간의 사진을 2장 이상 추가해주세요.');$('dropzone').focus();return;}
   setBusy(true);status('사진을 처리할 준비를 하고 있어요.');
@@ -139,7 +177,7 @@ $('generate').onclick=async()=>{
     const response=await fetch(url.href);if(!response.ok)throw Error('결과를 가져오지 못했어요. 다시 시도해주세요.');
     const result=state.viewer.parsePLY(await response.arrayBuffer());state.scene='result';
     const meta=output[1]||{};
-    $('scene-title').textContent='나의 첫 번째 공간';$('scene-tag').innerHTML='<span></span>YOUR RECONSTRUCTION';
+    $('scene-title').textContent='3D 시각화 공간';$('scene-tag').innerHTML='<span></span>YOUR RECONSTRUCTION';
     $('scene-caption-title').textContent='My reconstructed space';$('scene-description').textContent='사진 속 공간이 새로운 시점으로 펼쳐집니다.';
     $('result-image-count').textContent=`${meta.image_count||state.images.length}장`;$('engine-label').textContent='Pi3X';
     $('confidence').disabled=!result.hasConfidence;$('confidence-hint').textContent=result.hasConfidence?'신뢰도가 낮은 점을 숨겨요.':'이 파일에는 신뢰도 정보가 없어요.';
@@ -179,7 +217,7 @@ $('ply-input').onchange=async e=>{
   try {
     if(file.size>100*1024*1024)throw Error('100 MB 이하의 PLY 파일을 선택해주세요.');
     const result=state.viewer.parsePLY(await file.arrayBuffer());state.scene='import';
-    $('scene-title').textContent=file.name;$('scene-tag').innerHTML='<span></span>IMPORTED SPACE';$('scene-caption-title').textContent='Your saved space';$('scene-description').textContent='저장한 결과를 다시 탐색해보세요.';
+    $('scene-title').textContent='3D 시각화 공간';$('scene-tag').innerHTML='<span></span>IMPORTED SPACE';$('scene-caption-title').textContent='Your saved space';$('scene-description').textContent='저장한 결과를 다시 탐색해보세요.';
     $('result-image-count').textContent='—';$('engine-label').textContent='PLY 불러오기';$('confidence').disabled=!result.hasConfidence;
     $('confidence-hint').textContent=result.hasConfidence?'신뢰도가 낮은 점을 숨겨요.':'이 파일에는 신뢰도 정보가 없어요.';syncOrientation();setView();toast('저장한 3D 공간을 불러왔어요.');
   }catch(error){toast(error.message||'PLY를 읽지 못했어요. 파일을 확인해주세요.');}

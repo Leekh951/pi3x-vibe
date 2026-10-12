@@ -40,4 +40,4 @@ def reconstruct(images, quality, progress=gr.Progress()):
 demo = backend.build_demo(reconstruct)
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860, share=False,
-                show_error=True, max_file_size="15mb")
+                show_error=True, max_file_size="15mb", ssr_mode=False)
