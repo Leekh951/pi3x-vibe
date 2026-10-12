@@ -58,18 +58,18 @@
       <div class="studio-footnote"><span>사진에서 점으로, 점에서 공간으로.</span><span>POWERED BY <a href="https://github.com/yyfz/Pi3" target="_blank" rel="noopener">π³ / Pi3X</a></span></div>
       <section class="mesh-studio" aria-labelledby="mesh-title">
         <div class="mesh-heading"><div><span class="eyebrow">MAKE IT YOUR OWN</span><h2 id="mesh-title">같은 공간, 새로운 분위기</h2></div><a href="https://huggingface.co/spaces/leekh951/pi3x-mesh" class="subtle-button" target="_blank" rel="noopener">메시 Space 열기 ↗</a></div>
-        <p class="mesh-intro">Pi3X 결과로 메시를 만들고, 원하는 재질과 빛을 입혀보세요. 원본 공간의 구조는 유지됩니다.</p>
+        <p class="mesh-intro">Pi3X로 재구성한 실내 전체에 새로운 재질을 입혀보세요. 벽과 바닥, 가구를 포함한 공간의 구조는 유지됩니다.</p>
         <div class="mesh-inputs"><p id="mesh-source">위에서 Pi3X 결과를 만들거나 PLY와 원본 사진을 선택해주세요.</p><div class="mesh-file-actions"><label>PLY 선택<input id="mesh-ply" type="file" accept=".ply"></label><label>원본 사진 선택<input id="mesh-images" type="file" accept="image/jpeg,image/png,image/webp" multiple></label></div>
           <details class="mesh-camera-settings"><summary>카메라 포즈가 있나요?</summary><label>포즈 JSON<input id="mesh-poses" type="file" accept=".json"></label><label>PLY 생성 품질<select id="mesh-quality"><option value="fast">가볍게</option><option value="detail">섬세하게</option></select></label><p>포즈 파일이 없으면 새 Space에서 같은 사진으로 카메라를 복원합니다. 추가 GPU 작업이 필요해요.</p></details>
           <button id="mesh-prepare" type="button" class="orientation-button">원본 메시 만들기</button>
         </div>
-        <label class="mesh-prompt-label" for="mesh-prompt">어떤 분위기로 바꿀까요?</label>
-        <textarea id="mesh-prompt" rows="3" maxlength="600" placeholder="따뜻한 원목과 베이지 패브릭, 부드러운 오후 햇살"></textarea>
-        <button id="mesh-style" type="button" class="generate-button" disabled>재질·분위기 바꾸기</button>
+        <label class="mesh-prompt-label" for="mesh-prompt">실내 전체를 어떤 분위기로 바꿀까요? · 영문 권장</label>
+        <textarea id="mesh-prompt" rows="3" maxlength="600" placeholder="A cozy living room with oak wood, beige linen, warm neutral walls"></textarea>
+        <button id="mesh-style" type="button" class="generate-button" disabled>실내 전체 텍스처 바꾸기</button>
         <div class="mesh-progress"><p id="mesh-status" role="status" aria-live="polite">원본 메시를 먼저 만든 뒤 원하는 재질과 분위기를 적어주세요.</p><button id="mesh-cancel" type="button" class="subtle-button" hidden>대기 취소</button></div>
         <div class="mesh-viewer"><div class="mesh-mount" id="mesh-mount" hidden></div><div id="mesh-empty"><svg><use href="#cube-icon"/></svg><strong>나만의 재질을 입힐 공간</strong><span>원본 메시를 만들면 여기에 나타나요.</span></div></div>
         <div class="mesh-results"><div><button id="mesh-original" class="color-button" disabled>원본 메시</button><button id="mesh-styled" class="color-button" disabled>스타일 메시</button></div><div><a id="mesh-download" class="subtle-button" hidden>GLB 저장</a><a id="mesh-bundle" class="subtle-button" hidden>포즈·이미지 묶음</a><a id="mesh-texture" class="subtle-button" hidden>텍스처 저장</a></div></div>
-        <p class="mesh-note">사진에 보이는 표면을 연결합니다. 보이지 않는 영역에는 빈틈이 남을 수 있고, 시점 사이의 텍스처 경계가 어긋날 수 있어요.</p>
+        <p class="mesh-note">사진에 보이는 실내 표면을 연결해 기본 색상 텍스처를 만듭니다. 촬영되지 않은 영역과 경계에는 빈틈이 남을 수 있어요. 금속성·거칠기 생성과 영역별 선택은 아직 지원하지 않습니다.</p>
       </section>
     </section>
   </main>

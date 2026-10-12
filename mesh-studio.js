@@ -121,8 +121,8 @@ export function initMeshStudio({toast}) {
       const original=await resultBlob(output[0]);const bundle=await resultBlob(output[4]);checkCurrent(version);
       state.original=original;state.styled=null;state.sceneId=output[1];
       download('mesh-bundle',bundle,'SPACE_posed-images.zip');await show('original');
-      const coverage=Math.round((output[3]?.textured_faces_ratio||0)*100);
-      status(`원본 메시 준비 완료 · 사진으로 덮인 면 ${coverage}%. 원하는 재질과 분위기를 적어주세요.`);
+      const coverage=Math.round((output[3]?.photographed_surface_ratio||0)*100);
+      status(`실내 전체 메시 준비 완료 · 사진으로 덮인 표면 ${coverage}%. 원하는 재질과 분위기를 적어주세요.`);
     }catch(error){failed(error);}
     finally{state.controller=null;busy(false);}
   };
@@ -132,11 +132,13 @@ export function initMeshStudio({toast}) {
     const version=state.version;busy(true);state.controller=new AbortController();
     try {
       const client=await connect();const caps=(await client.predict('/capabilities',{})).data?.[0];
-      if(!caps?.texture_ready)throw Error('새 Space의 텍스처 모델이 아직 준비되지 않았어요. 모델 접근 동의와 HF_TOKEN을 확인해주세요.');
+      if(!caps?.texture_ready)throw Error('새 Space의 장면 텍스처 모델이 아직 준비되지 않았어요. 서버 시작 상태를 확인해주세요.');
+      if(caps?.scope!=='indoor_scene')throw Error('새 Space의 장면 텍스처 버전으로 업데이트가 필요해요.');
       const output=await runJob(client,'/restyle_scene',{scene_id:state.sceneId,prompt,seed:0},version);
       const styled=await resultBlob(output[0]);const texture=await resultBlob(output[1]);checkCurrent(version);
       state.styled=styled;download('mesh-texture',texture,'SPACE_texture.png');await show('styled');
-      status('원본 메시의 구조를 유지하고 텍스처를 바꿨어요. 원본과 비교해보세요.');
+      const coverage=Math.round((output[2]?.styled_surface_ratio||0)*100);
+      status(`실내 전체의 구조를 유지하고 텍스처를 바꿨어요 · 적용된 표면 ${coverage}%. 원본과 비교해보세요.`);
     }catch(error){failed(error);}
     finally{state.controller=null;busy(false);}
   };

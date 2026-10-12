@@ -38,7 +38,7 @@ def write_glb(path, vertices, faces, uv, texture_png, colors, extras=None):
         document['accessors'].append(record)
         return len(document['accessors'])-1
 
-    # Flat triangle corners keep camera UV seams from moving the geometry.
+    # Flat triangle corners keep UV seams from moving the geometry.
     positions = [vertices[int(i)] for face in faces for i in face]
     corner_colors = [colors[int(i)] for face in faces for i in face]
     attributes = {'POSITION':accessor(positions,3,True), 'TEXCOORD_0':accessor(uv,2),

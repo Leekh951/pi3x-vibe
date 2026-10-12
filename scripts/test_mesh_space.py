@@ -17,7 +17,7 @@ def load(name):
     return module
 
 
-contracts=load('contracts');writer=load('glb')
+contracts=load('contracts');writer=load('glb');raster=load('raster')
 
 
 def read_glb(data):
@@ -92,9 +92,33 @@ class MeshTests(unittest.TestCase):
             output,archive=build(Path(folder)/'mesh')
             with zipfile.ZipFile(archive) as bundle:
                 self.assertEqual(set(bundle.namelist()),{p.name for p in output.iterdir() if p.is_file()})
-                for required in ('app.py','models.py','geometry.py','glb.py','contracts.py','requirements.txt','packages.txt','README.md'):
+                for required in ('app.py','models.py','geometry.py','glb.py','contracts.py','raster.py','requirements.txt','packages.txt','README.md'):
                     self.assertIn(required,bundle.namelist())
                 self.assertNotIn('backend.py',bundle.namelist())
+
+    def test_pixel_center_raster_is_independent_of_winding_and_clips(self):
+        triangle=[(0,0),(1,0),(0,1)]
+        samples=list(raster.triangle_samples(triangle,4,4))
+        reverse=list(raster.triangle_samples(triangle[::-1],4,4))
+        self.assertEqual({(x,y) for x,y,_ in samples},{(x,y) for x,y,_ in reverse})
+        self.assertEqual(len(samples),10)
+        x,y,weights=samples[0]
+        self.assertEqual((x,y),(0,0))
+        self.assertAlmostEqual(weights[0],.75)
+        self.assertAlmostEqual(weights[1],.125)
+        self.assertAlmostEqual(weights[2],.125)
+        clipped=list(raster.triangle_samples([(-2,-2),(2,-2),(0,2)],4,4))
+        self.assertTrue(all(0<=x<4 and 0<=y<4 for x,y,_ in clipped))
+        self.assertEqual(list(raster.triangle_samples([(0,0),(.5,.5),(1,1)],4,4)),[])
+
+    def test_perspective_depth_and_surface_weights(self):
+        weights,depth=raster.perspective_weights([.5,.25,.25],[1,2,4])
+        self.assertAlmostEqual(depth,16/11)
+        self.assertAlmostEqual(weights[0],8/11)
+        self.assertAlmostEqual(weights[1],2/11)
+        self.assertAlmostEqual(weights[2],1/11)
+        with self.assertRaises(ValueError):
+            raster.perspective_weights([.5,.25,.25],[1,-2,4])
 
 
 if __name__=='__main__': unittest.main()

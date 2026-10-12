@@ -15,8 +15,10 @@ from safetensors import safe_open
 
 PI3_REVISION = '9fa3ddb3f8d53041f8b2738df404f62223bbaa7b'
 PI3_WEIGHTS = 'bb1deea4d7423de5b30691739cb451a3f57dc1d5'
-FLUX_REPO = 'black-forest-labs/FLUX.2-klein-9B'
-FLUX_REVISION = '92196c8e11f7b6cf2b7493e037d8c5345c559216'
+BASE_REPO = 'stable-diffusion-v1-5/stable-diffusion-v1-5'
+BASE_REVISION = '451f4fe16113bff5a5d2269ed5ad43b0592e9a14'
+DEPTH_REPO = 'lllyasviel/control_v11f1p_sd15_depth'
+DEPTH_REVISION = '539f99181d33db39cf1af2e517cd8056785f0a87'
 SAFETY_REVISION = 'cb41f3a270d63d454d385fc2e4f571c487c253c5'
 PI3 = PIPE = CHECKER = PROCESSOR = None
 ERRORS = {}
@@ -44,15 +46,20 @@ def initialize():
         ERRORS['poses'] = type(error).__name__
         print('Pi3X pose startup failed:',type(error).__name__,flush=True)
     try:
-        from diffusers import Flux2KleinPipeline
+        from diffusers import ControlNetModel,StableDiffusionControlNetInpaintPipeline,UniPCMultistepScheduler
         from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
         from transformers import CLIPImageProcessor
-        CHECKER = StableDiffusionSafetyChecker.from_pretrained('CompVis/stable-diffusion-safety-checker',revision=SAFETY_REVISION,torch_dtype=torch.float32,token=token).to('cuda').eval()
+        CHECKER = StableDiffusionSafetyChecker.from_pretrained('CompVis/stable-diffusion-safety-checker',revision=SAFETY_REVISION,torch_dtype=torch.float16,token=token).to('cuda').eval()
         PROCESSOR = CLIPImageProcessor.from_pretrained('CompVis/stable-diffusion-safety-checker',revision=SAFETY_REVISION,token=token)
-        candidate = Flux2KleinPipeline.from_pretrained(FLUX_REPO,revision=FLUX_REVISION,
-            torch_dtype=torch.bfloat16,low_cpu_mem_usage=True,token=token)
+        control = ControlNetModel.from_pretrained(DEPTH_REPO,revision=DEPTH_REVISION,
+            torch_dtype=torch.float16,variant='fp16',use_safetensors=True,token=token)
+        candidate = StableDiffusionControlNetInpaintPipeline.from_pretrained(BASE_REPO,revision=BASE_REVISION,
+            controlnet=control,torch_dtype=torch.float16,variant='fp16',use_safetensors=True,
+            low_cpu_mem_usage=True,token=token,safety_checker=CHECKER,feature_extractor=PROCESSOR)
+        candidate.scheduler = UniPCMultistepScheduler.from_config(candidate.scheduler.config)
         candidate.to('cuda'); candidate.vae.enable_tiling()
         PIPE = candidate
+
     except Exception as error:
         ERRORS['texture'] = type(error).__name__
         print('Texture startup failed:',type(error).__name__,'Check model approval and HF_TOKEN.',flush=True)
@@ -118,24 +125,24 @@ def recover(paths,quality):
 @torch.inference_mode()
 def check_images(images):
     if CHECKER is None or PROCESSOR is None: raise ValueError('이미지 검사 모델이 준비되지 않았어요.')
-    clip = PROCESSOR(images=images,return_tensors='pt').pixel_values.to('cuda',dtype=torch.float32)
+    clip = PROCESSOR(images=images,return_tensors='pt').pixel_values.to('cuda',dtype=next(CHECKER.parameters()).dtype)
     _,flags = CHECKER(clip_input=clip,images=np.zeros((len(images),224,224,3),dtype=np.float32))
     if any(flags): raise ValueError('이미지 검사에서 처리할 수 없는 사진이 감지됐어요.')
 
 
 @torch.inference_mode()
-def restyle(atlas,images,prompt,seed):
-    if PIPE is None: raise ValueError('텍스처 모델이 준비되지 않았어요. FLUX 모델 동의와 새 Space의 HF_TOKEN을 확인해주세요.')
+def paint_view(rendered,mask,depth,images,prompt,seed):
+    if PIPE is None: raise ValueError('장면 텍스처 모델이 준비되지 않았어요. 새 Space의 서버 시작 로그를 확인해주세요.')
     check_images(images)
-    instruction = ('Edit the materials, colors and lighting in every photo tile of this multi-view contact sheet. '
-        'All tiles show the SAME room from different fixed cameras. Preserve the exact tile layout, '
-        'perspective, silhouettes, furniture positions, windows, doors and room geometry. Apply identical '
-        'materials to the same surfaces across views. Keep any empty tile unchanged. Requested style: '+prompt)
-    output = PIPE(image=atlas,prompt=instruction,width=atlas.width,height=atlas.height,
-        guidance_scale=1.0,num_inference_steps=4,
-        generator=torch.Generator(device='cuda').manual_seed(seed)).images[0]
-    if output.size != atlas.size: output = output.resize(atlas.size,Image.Resampling.LANCZOS)
-    from geometry import TILE
-    tiles = [output.crop((i%2*TILE[0],i//2*TILE[1],(i%2+1)*TILE[0],(i//2+1)*TILE[1])) for i in range(len(images))]
-    check_images(tiles)
-    return output
+    instruction = ('An interior room, preserve the existing room layout, walls, floor and furniture silhouettes. '
+        'Consistent surface materials across the whole interior scene, realistic textures, no people. '+prompt)
+    result = PIPE(prompt=instruction,negative_prompt='people, text, watermark, blurry, distorted geometry',
+        image=rendered,mask_image=mask,control_image=depth,width=rendered.width,height=rendered.height,
+        strength=1.0,controlnet_conditioning_scale=1.0,guidance_scale=7.0,num_inference_steps=20,
+        generator=torch.Generator(device='cuda').manual_seed(seed))
+    if any(result.nsfw_content_detected or []): raise ValueError('이미지 검사에서 처리할 수 없는 결과가 감지됐어요.')
+    output = result.images[0].convert('RGB')
+    check_images([output])
+    # Preserve all previously painted surfaces and background exactly even if the
+    # denoiser's latent blending changes pixels outside the requested mask.
+    return Image.composite(output,rendered,mask)
