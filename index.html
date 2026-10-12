@@ -56,6 +56,21 @@
       </details>
       <div class="scene-details"><div class="scene-stat"><span>공간을 이루는 점</span><strong id="point-count">—</strong></div><div class="scene-stat"><span>입력 사진</span><strong id="result-image-count">예제 장면</strong></div><div class="scene-stat"><span>재구성 엔진</span><strong id="engine-label">예제 · 합성 데이터</strong></div><div class="confidence-control"><label for="confidence">노이즈 정리 <output id="confidence-value">10%</output></label><input type="range" id="confidence" min="0" max="95" step="5" value="10"><span id="confidence-hint">신뢰도가 낮은 점을 숨겨요.</span></div></div>
       <div class="studio-footnote"><span>사진에서 점으로, 점에서 공간으로.</span><span>POWERED BY <a href="https://github.com/yyfz/Pi3" target="_blank" rel="noopener">π³ / Pi3X</a></span></div>
+      <section class="mesh-studio" aria-labelledby="mesh-title">
+        <div class="mesh-heading"><div><span class="eyebrow">MAKE IT YOUR OWN</span><h2 id="mesh-title">같은 공간, 새로운 분위기</h2></div><a href="https://huggingface.co/spaces/leekh951/pi3x-mesh" class="subtle-button" target="_blank" rel="noopener">메시 Space 열기 ↗</a></div>
+        <p class="mesh-intro">Pi3X 결과로 메시를 만들고, 원하는 재질과 빛을 입혀보세요. 원본 공간의 구조는 유지됩니다.</p>
+        <div class="mesh-inputs"><p id="mesh-source">위에서 Pi3X 결과를 만들거나 PLY와 원본 사진을 선택해주세요.</p><div class="mesh-file-actions"><label>PLY 선택<input id="mesh-ply" type="file" accept=".ply"></label><label>원본 사진 선택<input id="mesh-images" type="file" accept="image/jpeg,image/png,image/webp" multiple></label></div>
+          <details class="mesh-camera-settings"><summary>카메라 포즈가 있나요?</summary><label>포즈 JSON<input id="mesh-poses" type="file" accept=".json"></label><label>PLY 생성 품질<select id="mesh-quality"><option value="fast">가볍게</option><option value="detail">섬세하게</option></select></label><p>포즈 파일이 없으면 새 Space에서 같은 사진으로 카메라를 복원합니다. 추가 GPU 작업이 필요해요.</p></details>
+          <button id="mesh-prepare" type="button" class="orientation-button">원본 메시 만들기</button>
+        </div>
+        <label class="mesh-prompt-label" for="mesh-prompt">어떤 분위기로 바꿀까요?</label>
+        <textarea id="mesh-prompt" rows="3" maxlength="600" placeholder="따뜻한 원목과 베이지 패브릭, 부드러운 오후 햇살"></textarea>
+        <button id="mesh-style" type="button" class="generate-button" disabled>재질·분위기 바꾸기</button>
+        <div class="mesh-progress"><p id="mesh-status" role="status" aria-live="polite">원본 메시를 먼저 만든 뒤 원하는 재질과 분위기를 적어주세요.</p><button id="mesh-cancel" type="button" class="subtle-button" hidden>대기 취소</button></div>
+        <div class="mesh-viewer"><div class="mesh-mount" id="mesh-mount" hidden></div><div id="mesh-empty"><svg><use href="#cube-icon"/></svg><strong>나만의 재질을 입힐 공간</strong><span>원본 메시를 만들면 여기에 나타나요.</span></div></div>
+        <div class="mesh-results"><div><button id="mesh-original" class="color-button" disabled>원본 메시</button><button id="mesh-styled" class="color-button" disabled>스타일 메시</button></div><div><a id="mesh-download" class="subtle-button" hidden>GLB 저장</a><a id="mesh-bundle" class="subtle-button" hidden>포즈·이미지 묶음</a><a id="mesh-texture" class="subtle-button" hidden>텍스처 저장</a></div></div>
+        <p class="mesh-note">사진에 보이는 표면을 연결합니다. 보이지 않는 영역에는 빈틈이 남을 수 있고, 시점 사이의 텍스처 경계가 어긋날 수 있어요.</p>
+      </section>
     </section>
   </main>
   <dialog id="guide-dialog"><form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="닫기">×</button></form><span class="eyebrow">A LITTLE GUIDE</span><h2>좋은 공간은 좋은 사진에서.</h2><div class="guide-item"><span>01</span><div><h3>같은 공간, 다른 각도</h3><p>카메라 위치를 조금씩 옮겨 촬영하세요. 이웃 사진 사이에 같은 물체가 충분히 겹치면 좋아요.</p></div></div><div class="guide-item"><span>02</span><div><h3>밝고, 선명하고, 가만히</h3><p>흔들림과 움직이는 사람을 피하세요. 거울이나 반짝이는 표면, 아무 무늬 없는 벽은 재구성이 어려울 수 있어요.</p></div></div><div class="guide-item"><span>03</span><div><h3>사진을 올리면 공간이 펼쳐져요</h3><p>사진 2–8장을 올리면 자동으로 생성을 시작해요. 잠시 기다리면 이 화면에 결과가 나타납니다. 설정을 바꾼 뒤 다시 만들고 싶다면 ‘3D 공간 만들기’를 누르세요. 처음에는 ‘가볍게’와 사진 3–4장을 추천해요.</p></div></div><div class="guide-item"><span>04</span><div><h3>손끝으로 탐색하세요</h3><p>드래그로 회전, 휠로 확대, 우클릭으로 이동해요. 모바일에서는 한 손가락으로 회전하고 두 손가락으로 확대·이동할 수 있어요.</p></div></div><div class="guide-note">결과는 색이 있는 점 구름이에요. 정밀한 치수 측정이나 완성된 메시 모델과는 차이가 있어요. 예제 장면은 조작 체험을 위한 합성 데이터입니다.</div></dialog>

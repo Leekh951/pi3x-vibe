@@ -3,11 +3,13 @@ import { SpaceViewer } from './viewer.js';
 import { GPUBackend, BackendUnavailable, normalizeEndpoint } from './gpu-backend.mjs';
 import { jobProgress, watchGPUJob } from './gpu-job.mjs';
 import { uploadImages } from './gpu-upload.mjs';
+import { initMeshStudio } from './mesh-studio.js';
 const $ = id => document.getElementById(id);
 const state = { images: [], quality: 'fast', client: null, api: null, busy: false, viewer: null, scene: 'demo', backendStatus: 'connecting', activeController: null, examplesLoading: false, manualGeneration: false };
 let toastTimer;
 function toast(message) { $('toast').textContent=message; $('toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,5500); }
 function status(message,error=false) { $('task-status').textContent=message; $('task-status').classList.toggle('error',error); }
+const meshStudio=initMeshStudio({toast});
 function setView(top=false) { state.viewer?.fit(top); for(const [id,active] of [['view-top',top],['view-perspective',!top]]) { $(id).classList.toggle('active',active); $(id).setAttribute('aria-pressed',String(active)); } $('auto-rotate').classList.remove('active'); $('auto-rotate').setAttribute('aria-pressed','false'); }
 function syncOrientation() {
   const orientation=state.viewer?.orientation;
@@ -175,8 +177,10 @@ $('generate').onclick=async()=>{
       url=new URL(`${prefix}/file=${encodeURIComponent(file.path)}`,endpoint);
     }
     const response=await fetch(url.href);if(!response.ok)throw Error('결과를 가져오지 못했어요. 다시 시도해주세요.');
-    const result=state.viewer.parsePLY(await response.arrayBuffer());state.scene='result';
+    const resultBuffer=await response.arrayBuffer();
+    const result=state.viewer.parsePLY(resultBuffer);state.scene='result';
     const meta=output[1]||{};
+    meshStudio.setSource(new File([resultBuffer],'SPACE_raw.ply',{type:'application/octet-stream'}),state.images.map(x=>x.file),state.quality);
     $('scene-title').textContent='3D 시각화 공간';$('scene-tag').innerHTML='<span></span>YOUR RECONSTRUCTION';
     $('scene-caption-title').textContent='My reconstructed space';$('scene-description').textContent='사진 속 공간이 새로운 시점으로 펼쳐집니다.';
     $('result-image-count').textContent=`${meta.image_count||state.images.length}장`;$('engine-label').textContent='Pi3X';
@@ -217,6 +221,7 @@ $('ply-input').onchange=async e=>{
   try {
     if(file.size>100*1024*1024)throw Error('100 MB 이하의 PLY 파일을 선택해주세요.');
     const result=state.viewer.parsePLY(await file.arrayBuffer());state.scene='import';
+    meshStudio.setSource(file,[],state.quality);
     $('scene-title').textContent='3D 시각화 공간';$('scene-tag').innerHTML='<span></span>IMPORTED SPACE';$('scene-caption-title').textContent='Your saved space';$('scene-description').textContent='저장한 결과를 다시 탐색해보세요.';
     $('result-image-count').textContent='—';$('engine-label').textContent='PLY 불러오기';$('confidence').disabled=!result.hasConfidence;
     $('confidence-hint').textContent=result.hasConfidence?'신뢰도가 낮은 점을 숨겨요.':'이 파일에는 신뢰도 정보가 없어요.';syncOrientation();setView();toast('저장한 3D 공간을 불러왔어요.');

@@ -27,6 +27,8 @@ jobs:
         run: python3 scripts/test_pages.py
       - name: Validate GPU deployment package
         run: python3 scripts/test_space.py
+      - name: Validate independent Mesh Space contracts and GLB textures
+        run: python3 scripts/test_mesh_space.py
       - name: Validate automatic GPU connection
         run: node scripts/test_backend.mjs
       - name: Validate GPU progress and cancellation
@@ -47,11 +49,11 @@ jobs:
           PAGES_REPOSITORY: ${{ github.repository }}
           PAGES_VIEWER_URL: ${{ steps.pages.outputs.base_url }}
           PAGES_REF: ${{ github.ref_name }}
-        run: python3 scripts/build_pages.py --repository "$PAGES_REPOSITORY" --viewer-url "$PAGES_VIEWER_URL" --ref "$PAGES_REF"
+        run: python3 scripts/build_pages.py --output dist/pages --repository "$PAGES_REPOSITORY" --viewer-url "$PAGES_VIEWER_URL" --ref "$PAGES_REF"
       - name: Upload website
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: dist/pages
       - name: Deploy website
         id: deployment
         uses: actions/deploy-pages@v5
