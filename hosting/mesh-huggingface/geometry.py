@@ -147,7 +147,7 @@ def surface_maps(vertices,faces,colors,uv):
 def project(points,frame,size):
     pose = np.asarray(frame['camera_to_world'])
     local = (points-pose[:3,3])@pose[:3,:3]
-    intrinsic = np.asarray(frame['intrinsics']).copy()
+    intrinsic = np.asarray(frame['intrinsics'],dtype=np.float64).copy()
     intrinsic[0] *= size[0]/frame['image_size'][0]
     intrinsic[1] *= size[1]/frame['image_size'][1]
     intrinsic[0,2] += (size[0]/frame['image_size'][0]-1)*.5

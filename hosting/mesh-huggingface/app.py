@@ -203,9 +203,9 @@ with gr.Blocks(title='Pi3X Mesh Studio') as demo:
     prepare.click(prepare_scene,[ply,images,poses,quality],[original,scene_id,cameras,metadata,bundle],api_name='prepare_scene',concurrency_limit=1,concurrency_id='mesh')
     change.click(restyle_scene,[scene_id,prompt,seed],[styled,texture,changed_metadata],api_name='restyle_scene',concurrency_limit=1,concurrency_id='mesh')
     state = gr.JSON(visible=False)
-    demo.load(capabilities,outputs=state,api_name='capabilities',queue=False)
+    demo.load(capabilities,outputs=state,api_name='capabilities',queue=False,postprocess=False)
     check = gr.Button(visible=False)
-    check.click(cpu_check,outputs=state,api_name='cpu_check',queue=False)
+    check.click(cpu_check,outputs=state,api_name='cpu_check',queue=False,postprocess=False)
 demo.queue(max_size=4,default_concurrency_limit=1)
 if __name__ == '__main__':
     demo.launch(server_name='0.0.0.0',server_port=7860,share=False,ssr_mode=False,
