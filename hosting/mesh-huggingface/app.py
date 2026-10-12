@@ -62,11 +62,13 @@ def prepare_scene(ply,images,poses,quality,request:gr.Request,progress=gr.Progre
         names = [Path(p).name for p in images or []]
         if len(set(names)) != len(names): raise ValueError('사진 파일 이름은 서로 달라야 해요.')
         progress(.05,desc='PLY와 원본 사진을 확인하고 있어요.')
-        cloud = read_cloud(Path(ply)); photos = models.load_images(images)
+        cloud,basis = read_cloud(Path(ply)); photos = models.load_images(images)
         alignment = {}
         if poses:
             if Path(poses).stat().st_size > 1024*1024: raise ValueError('포즈 JSON은 1 MB 이하로 선택해주세요.')
             document = json.loads(Path(poses).read_text())
+            if isinstance(document,dict) and document.get('world_coordinate_system',basis) != basis:
+                raise ValueError('PLY와 포즈의 world_coordinate_system을 맞춰주세요.')
             pose_source = 'uploaded'
         else:
             progress(.12,desc='새 Space에서 카메라 포즈를 복원하고 있어요.')
@@ -75,6 +77,7 @@ def prepare_scene(ply,images,poses,quality,request:gr.Request,progress=gr.Progre
             document,alignment = align_recovered(predicted,cloud,document)
             pose_source = 'recovered_and_aligned'
         frames = validate_cameras(document,names)
+        document['world_coordinate_system'] = basis
         progress(.5,desc='입력 점군의 표면을 연결해 메시를 만들고 있어요.')
         vertices,faces,colors = triangulate(cloud)
         progress(.75,desc='보이는 표면에 사진을 투영하고 있어요.')
@@ -88,7 +91,7 @@ def prepare_scene(ply,images,poses,quality,request:gr.Request,progress=gr.Progre
         metadata = {'scene_id':key,'vertex_count':len(vertices),'face_count':len(faces),
             'image_count':len(photos),'textured_faces_ratio':round(coverage,3),
             'pose_source':pose_source,'geometry_sha256':digest,'geometry_preserved':True,
-            'coordinate_system':'OpenCV','display_coordinate_system':'Y_UP',**alignment,
+            'coordinate_system':basis,'camera_coordinate_system':'OpenCV','display_coordinate_system':'Y_UP',**alignment,
             'limitation':'Observed surfaces only; holes and texture seams may remain.'}
         np.savez_compressed(directory/'mesh.npz',vertices=vertices,faces=faces,colors=colors,uv=uv,view_ids=view_ids)
         atlas.save(directory/'original-atlas.png')

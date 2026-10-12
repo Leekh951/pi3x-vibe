@@ -9,7 +9,7 @@ def write_glb(path, vertices, faces, uv, texture_png, colors, extras=None):
     # UV coordinates refer to a top-left image origin; glTF uses the same origin.
     document = {'asset': {'version':'2.0', 'generator':'Pi3X Mesh Studio'},
                 'scene':0, 'scenes':[{'nodes':[0]}],
-                'nodes':[{'mesh':0, 'scale':[1,-1,-1]}],
+                'nodes':[{'mesh':0, 'scale':[1,1,1] if (extras or {}).get('coordinate_system')=='Y_UP' else [1,-1,-1]}],
                 'meshes':[{'primitives':[]}], 'bufferViews':[], 'accessors':[],
                 'materials':[{'doubleSided':True, 'pbrMetallicRoughness':{
                     'baseColorTexture':{'index':0}, 'metallicFactor':0, 'roughnessFactor':1}}],

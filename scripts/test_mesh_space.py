@@ -77,6 +77,10 @@ class MeshTests(unittest.TestCase):
                 bv=b['bufferViews'][b['accessors'][bi]['bufferView']]
                 self.assertEqual(ab[av['byteOffset']:av['byteOffset']+av['byteLength']],bb[bv['byteOffset']:bv['byteOffset']+bv['byteLength']])
             self.assertEqual(a['nodes'][0]['scale'],[1,-1,-1])
+            upright=Path(folder)/'upright.glb'
+            writer.write_glb(upright,vertices,faces,uv,png([255,255,255]),[[1,1,1]]*3,{'coordinate_system':'Y_UP'})
+            up,_=read_glb(upright.read_bytes())
+            self.assertEqual(up['nodes'][0]['scale'],[1,1,1],'saved upright PLYs are not flipped twice')
             image=b['bufferViews'][b['images'][0]['bufferView']]
             self.assertEqual(bb[image['byteOffset']:image['byteOffset']+image['byteLength']],png([130,80,30]))
             self.assertNotEqual(original.read_bytes(),styled.read_bytes())

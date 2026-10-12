@@ -44,7 +44,8 @@ def read_cloud(path):
     while len(cloud.points) > 100000:
         voxel *= 1.4
         cloud = cloud.voxel_down_sample(voxel)
-    return cloud
+    basis = 'Y_UP' if b'comment SPACE coordinate_system Y_UP' in header else 'OpenCV'
+    return cloud,basis
 
 
 def align_recovered(predicted, target, cameras):

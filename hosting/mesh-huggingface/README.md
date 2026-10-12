@@ -37,6 +37,7 @@ Camera contract (`image_size` is the resolution at which K is expressed):
 ```json
 {
   "coordinate_system": "OpenCV",
+  "world_coordinate_system": "OpenCV",
   "pose_convention": "camera_to_world",
   "frames": [{
     "image": "living-room-01.jpg",
@@ -48,6 +49,11 @@ Camera contract (`image_size` is the resolution at which K is expressed):
 ```
 
 The example matrix is illustrative, not an estimate for the example photos.
+`coordinate_system` describes optical camera axes. `world_coordinate_system`
+describes the PLY world axes: `OpenCV` for raw Pi3X files, or `Y_UP` for files saved
+by the page's orientation controls. Both cameras and PLY must use the same world
+frame. Recovered poses are aligned to the actual uploaded PLY, including saved
+orientation. The GLB converts raw OpenCV worlds once and leaves Y_UP worlds intact.
 
 API: `/prepare_scene(ply, images, poses, quality)` → original GLB, scene ID,
 cameras JSON, metadata, posed-images ZIP. `/restyle_scene(scene_id, prompt, seed)`
