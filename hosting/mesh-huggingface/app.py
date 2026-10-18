@@ -1,4 +1,9 @@
 """Independent Pi3X Mesh Space. Does not call or update the original Space."""
+import os
+# The shared CPU worker should not spawn a large BLAS/OpenMP thread pool for
+# every small matrix operation. Operators may override these values explicitly.
+for variable in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS'):
+    os.environ.setdefault(variable,'2')
 import spaces  # enable ZeroGPU emulation before importing torch
 import hashlib
 import json
@@ -13,6 +18,8 @@ import gradio as gr
 import numpy as np
 from PIL import Image
 import models
+from scene_cache import input_fingerprint
+from cpu_performance import run_benchmark
 from contracts import validate_cameras,validate_prompt
 from geometry import (read_cloud,align_recovered,triangulate,unwrap_surface,surface_maps,
     render_frame,bake_camera,view_inputs,texture_image,export_scene,TEXTURE_SIZE,cpu_check)
@@ -24,7 +31,7 @@ models.initialize()
 
 
 def capabilities():
-    return {'service':'pi3x-mesh','version':2,'texture_ready':models.PIPE is not None,
+    return {'service':'pi3x-mesh','version':3,'performance_revision':'cpu-v2','texture_ready':models.PIPE is not None,
             'pose_recovery_ready':models.PI3 is not None,'errors':models.ERRORS,
             'model':models.DEPTH_REPO,'geometry_editing':False,
             'scope':'indoor_scene','method':'mesh_depth_shared_uv_inpainting','pbr_materials':False}
@@ -58,13 +65,30 @@ def purge():
 def prepare_scene(ply,images,poses,quality,request:gr.Request,progress=gr.Progress()):
     purge()
     directory = None
+    started=time.perf_counter(); stage_start=started; timings={}
+    def measured(name):
+        nonlocal stage_start
+        now=time.perf_counter();timings[name]=round(now-stage_start,4);stage_start=now
     try:
         session = owner(request)
         if not ply: raise ValueError('먼저 Pi3X PLY를 선택해주세요.')
         names = [Path(p).name for p in images or []]
+        if not 2<=len(names)<=8:raise ValueError('사진은 2–8장 필요해요.')
         if len(set(names)) != len(names): raise ValueError('사진 파일 이름은 서로 달라야 해요.')
+        progress(.01,desc='같은 입력으로 만든 메시가 있는지 확인하고 있어요.')
+        fingerprint=input_fingerprint(ply,images,poses,quality)
+        for cached_key,cached in SCENES.items():
+            folder=cached['directory']
+            if cached['owner']==session and cached.get('input_fingerprint')==fingerprint and (folder/'original.glb').exists():
+                progress(1,desc='이미 준비된 메시를 바로 불러왔어요.')
+                return (str(folder/'original.glb'),cached_key,str(folder/'cameras.json'),
+                        {**cached['metadata'],'cache_hit':True},str(folder/'posed-images.zip'))
+        measured('input_fingerprint')
         progress(.05,desc='PLY와 원본 사진을 확인하고 있어요.')
-        cloud,basis = read_cloud(Path(ply)); photos = models.load_images(images)
+        if quality not in {'fast','detail'}:raise ValueError('메시 품질을 확인해주세요.')
+        point_budget,face_budget=(30000,20000) if quality=='fast' else (100000,30000)
+        cloud,basis = read_cloud(Path(ply),max_points=point_budget); photos = models.load_images(images)
+        measured('read_inputs')
         alignment = {}
         if poses:
             if Path(poses).stat().st_size > 1024*1024: raise ValueError('포즈 JSON은 1 MB 이하로 선택해주세요.')
@@ -75,35 +99,49 @@ def prepare_scene(ply,images,poses,quality,request:gr.Request,progress=gr.Progre
         else:
             progress(.12,desc='새 Space에서 카메라 포즈를 복원하고 있어요.')
             document,predicted = recover_poses(images,quality)
+            measured('pose_recovery')
             progress(.35,desc='카메라 포즈를 입력 PLY의 좌표에 맞추고 있어요.')
             document,alignment = align_recovered(predicted,cloud,document)
+            measured('pose_alignment')
             pose_source = 'recovered_and_aligned'
         frames = validate_cameras(document,names)
         document['world_coordinate_system'] = basis
         progress(.5,desc='입력 점군의 표면을 연결해 메시를 만들고 있어요.')
-        vertices,faces,colors = triangulate(cloud)
+        vertices,faces,colors = triangulate(cloud,frames,
+            lambda fraction,desc:progress(.5+.08*fraction,desc=desc),max_faces=face_budget)
+        measured('meshing')
         key = uuid.uuid4().hex
         directory = ROOT/key; directory.mkdir()
         progress(.6,desc='실내 전체 메시의 UV를 만들고 있어요.')
-        uv = unwrap_surface(vertices,faces)
-        world,coverage,texture = surface_maps(vertices,faces,colors,uv)
+        uv = unwrap_surface(vertices,faces,iterations=1 if quality=='fast' else 2)
+        measured('uv_unwrap')
+        world,coverage,texture = surface_maps(vertices,faces,colors,uv,
+            lambda fraction:progress(.61+.04*fraction,desc='메시 표면의 텍스처 좌표를 계산하고 있어요.'))
+        measured('uv_raster')
         observed = np.zeros_like(coverage)
         for index,(frame,photo) in enumerate(zip(frames,photos)):
             progress(.65+.25*index/len(frames),desc=f'실내 카메라 {index+1}/{len(frames)}의 깊이와 원본 재질을 준비하고 있어요.')
-            depth,coordinates = render_frame(vertices,faces,uv,frame)
+            base=.65+.25*index/len(frames)
+            depth,coordinates = render_frame(vertices,faces,uv,frame,
+                lambda fraction:progress(base+.2*fraction/len(frames),desc=f'카메라 {index+1}/{len(frames)}에서 보이는 표면을 계산하고 있어요.'))
             np.save(directory/f'depth-{index}.npy',depth)
             np.save(directory/f'view-uv-{index}.npy',coordinates)
             bake_camera(texture,observed,world,coverage,frame,depth,photo)
+            measured(f'camera_{index+1}')
         ratio = float(observed.sum()/coverage.sum())
         if ratio < .1: raise ValueError('사진이 메시 표면과 맞지 않아요. 사진·포즈·PLY가 같은 장면인지 확인해주세요.')
         digest = hashlib.sha256(vertices.tobytes()+faces.tobytes()).hexdigest()
         metadata = {'scene_id':key,'vertex_count':len(vertices),'face_count':len(faces),
+            'meshing_input_points':len(cloud.points),'point_budget':point_budget,'face_budget':face_budget,
             'image_count':len(photos),'photographed_surface_ratio':round(ratio,3),
             'pose_source':pose_source,'geometry_sha256':digest,'geometry_preserved':True,
             'scope':'indoor_scene','texture_size':TEXTURE_SIZE,'method':'mesh_depth_shared_uv_inpainting',
+            'performance_revision':'cpu-v2','cache_hit':False,'timings_seconds':dict(timings),
             'coordinate_system':basis,'camera_coordinate_system':'OpenCV','display_coordinate_system':'Y_UP',**alignment,
             'limitation':'Observed indoor surfaces; no geometry editing, segmentation or full PBR generation.'}
-        np.savez_compressed(directory/'mesh.npz',vertices=vertices,faces=faces,uv=uv,
+        # This is a short-lived server cache, not a download. Avoid compressing
+        # dense floating point maps on the request's critical path.
+        np.savez(directory/'mesh.npz',vertices=vertices,faces=faces,uv=uv,
             world=world,coverage=coverage,texture=texture)
         atlas = texture_image(texture,coverage)
         atlas.save(directory/'original-atlas.png')
@@ -112,12 +150,16 @@ def prepare_scene(ply,images,poses,quality,request:gr.Request,progress=gr.Progre
         output = directory/'original.glb'
         export_scene(output,vertices,faces,uv,atlas,metadata)
         bundle = directory/'posed-images.zip'
-        with zipfile.ZipFile(bundle,'w',compression=zipfile.ZIP_DEFLATED) as archive:
+        # JPEG/PNG images are already compressed; storing them avoids redundant
+        # CPU compression before the original mesh can be returned.
+        with zipfile.ZipFile(bundle,'w',compression=zipfile.ZIP_STORED) as archive:
             archive.write(pose_file,'cameras.json'); archive.write(ply,'scene.ply')
             for original,name in zip(images,names): archive.write(original,'images/'+name)
-        for index,photo in enumerate(photos): photo.save(directory/f'photo-{index}.png')
+        for index,photo in enumerate(photos): photo.save(directory/f'photo-{index}.png',compress_level=1)
         SCENES[key] = {'owner':session,'created':time.time(),'directory':directory,
-                       'metadata':metadata,'image_count':len(photos),'frames':frames}
+                       'metadata':metadata,'image_count':len(photos),'frames':frames,'input_fingerprint':fingerprint}
+        measured('save_results')
+        print('Mesh preparation timings:',json.dumps({**timings,'total':round(time.perf_counter()-started,4)}),flush=True)
         progress(1,desc='원본 메시와 포즈가 준비됐어요.')
         return str(output),key,str(pose_file),metadata,str(bundle)
     except (ValueError,OSError,KeyError,TypeError) as error:
@@ -206,6 +248,9 @@ with gr.Blocks(title='Pi3X Mesh Studio') as demo:
     demo.load(capabilities,outputs=state,api_name='capabilities',queue=False,postprocess=False)
     check = gr.Button(visible=False)
     check.click(cpu_check,outputs=state,api_name='cpu_check',queue=False,postprocess=False)
+    benchmark=gr.Button(visible=False)
+    benchmark.click(run_benchmark,outputs=state,api_name='cpu_benchmark',queue=True,
+                    concurrency_limit=1,concurrency_id='mesh',postprocess=False)
 demo.queue(max_size=4,default_concurrency_limit=1)
 if __name__ == '__main__':
     demo.launch(server_name='0.0.0.0',server_port=7860,share=False,ssr_mode=False,

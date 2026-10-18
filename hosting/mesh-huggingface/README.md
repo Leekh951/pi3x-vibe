@@ -92,6 +92,32 @@ JSON is supplied. Repeating the same prompt/seed resumes completed camera views
 within the same session instead of spending GPU time on them again. Completed
 styles are reused. Cache and partial styles expire after six hours/container restart.
 
+### CPU preparation performance
+
+The `cpu-v2` fast path caps meshing input at 30,000 points and output at 20,000
+triangles (previously 100,000 / 30,000). This reduces fine surface detail; choose
+`detail` to retain the original 100,000 / 30,000 budgets. Both use a 1024 UV
+texture. UV charts are packed into a single atlas with block-aligned placement.
+Fast uses one chart-generation iteration; detail retains two.
+Large projected triangles use NumPy array rasterization; tiny triangles
+use a scalar path without generator/list conversion overhead. Camera poses orient
+observed surface normals directly, avoiding whole-cloud tangent-graph propagation.
+The CPU OpenMP/BLAS thread defaults are limited to 2 unless configured by the operator.
+
+Prepared results are reused only for identical file contents/names/order, quality,
+and poses in the same Gradio session. They are never shared across visitors. Server
+mesh arrays are stored without CPU compression; JPEG/PNG inputs are stored in the
+download ZIP without redundant compression. Temporary photo PNGs use a low
+compression level. Stage timings are logged and the CPU stages appear in progress.
+
+`/cpu_benchmark` runs bounded synthetic comparisons of the old/new pixel rasterizer
+and the old/new normal-orientation meshing paths on the Space's CPU. It never calls
+Pi3X or texture inference or acquires ZeroGPU. Its timings exclude GPU queueing,
+pose inference, uploads and full real-scene UV preparation; a microbenchmark
+speedup must not be presented as an end-to-end scene speedup. `/cpu_check` still
+checks visibility, locked surface colors and deployed UV generation. The existing
+Pi3X Space is unchanged, so absent camera poses still require separate recovery.
+
 Prompts should describe the **whole interior**, e.g. `A cozy living room with oak
 wood, beige linen, warm neutral walls`. English is recommended by these model
 cards. Region selection and named-object editing are not implemented. A prompt
@@ -127,6 +153,9 @@ Model safety checking stays enabled on inputs and generated views. No paid API i
 called, and neither PyTorch3D, gsplat nor a custom CUDA rasterizer is compiled.
 
 Local validation covers camera contracts, raster math, and GLB geometry/embedded
-textures without installing dependencies or invoking a GPU. NumPy/Open3D/xatlas
-integration, visual texture quality, latency and ZeroGPU runtime still need
-verification on the deployed Space. No inference was executed during development.
+textures without installing dependencies or invoking a GPU. Deployed CPU checks
+cover native xatlas generation, UV boundary handling, depth visibility and surface
+color locks. A bounded 9,216-point synthetic room comparison measured meshing at
+0.313 s before and 0.144 s after (same 16,797 faces), on that worker. This is not a
+whole real-scene latency estimate. Visual texture quality and ZeroGPU inference
+latency remain untested during this performance change; no GPU inference was run.

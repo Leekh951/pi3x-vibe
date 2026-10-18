@@ -7,13 +7,13 @@ from PIL import Image
 from scipy.ndimage import distance_transform_edt
 from plyfile import PlyData
 
-from raster import triangle_samples
+from accelerated import triangle_arrays,camera_oriented_normals
 from glb import write_glb
 
 TEXTURE_SIZE = 1024
 
 
-def read_cloud(path):
+def read_cloud(path,max_points=100000):
     if path.stat().st_size > 40*1024*1024:
         raise ValueError('PLY는 40 MB 이하로 선택해주세요.')
     with path.open('rb') as stream:
@@ -41,7 +41,7 @@ def read_cloud(path):
     if not np.isfinite(diagonal) or diagonal < 1e-6: raise ValueError('공간 크기를 확인해주세요.')
     voxel = diagonal/300
     cloud = cloud.voxel_down_sample(voxel)
-    while len(cloud.points) > 100000:
+    while len(cloud.points) > max_points:
         voxel *= 1.4
         cloud = cloud.voxel_down_sample(voxel)
     basis = 'Y_UP' if b'comment SPACE coordinate_system Y_UP' in header else 'OpenCV'
@@ -85,18 +85,28 @@ def align_recovered(predicted, target, cameras):
     return cameras, {'alignment_fitness':round(best.fitness,3),'alignment_rmse':round(best.inlier_rmse,5)}
 
 
-def triangulate(cloud):
+def triangulate(cloud,frames=None,report=None,max_faces=30000):
+    report=report or (lambda fraction,desc:None)
     diagonal = np.linalg.norm(np.ptp(np.asarray(cloud.points),axis=0))
+    report(0,'점군 표면의 방향을 계산하고 있어요.')
     cloud.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=diagonal*.025,max_nn=30))
-    # Orient locally; no watertight surface or unseen room geometry is invented.
-    try: cloud.orient_normals_consistent_tangent_plane(20)
-    except RuntimeError: cloud.orient_normals_to_align_with_direction()
+    report(.2,'촬영한 카메라를 기준으로 표면 방향을 맞추고 있어요.')
+    if frames:
+        centers=[np.asarray(frame['camera_to_world'])[:3,3] for frame in frames]
+        cloud.normals=o3d.utility.Vector3dVector(camera_oriented_normals(
+            np.asarray(cloud.points),np.asarray(cloud.normals),centers))
+    else:
+        # Compatibility path for PLY-only CPU comparisons without camera poses.
+        try: cloud.orient_normals_consistent_tangent_plane(20)
+        except RuntimeError: cloud.orient_normals_to_align_with_direction()
     distances = np.asarray(cloud.compute_nearest_neighbor_distance())
     radius = max(float(np.median(distances))*1.7,diagonal/600)
+    report(.35,'가까운 점들을 연결해 삼각형 표면을 만들고 있어요.')
     mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(cloud,
         o3d.utility.DoubleVector([radius,radius*2]))
     mesh.remove_degenerate_triangles(); mesh.remove_duplicated_triangles(); mesh.remove_unreferenced_vertices()
-    if len(mesh.triangles) > 30000: mesh = mesh.simplify_quadric_decimation(30000)
+    report(.8,'메시의 중복 면과 지나치게 큰 면을 정리하고 있어요.')
+    if len(mesh.triangles) > max_faces: mesh = mesh.simplify_quadric_decimation(max_faces)
     vertices,faces = np.asarray(mesh.vertices),np.asarray(mesh.triangles)
     if not len(faces): raise ValueError('면을 연결하지 못했어요. 더 겹치는 사진으로 만든 PLY를 사용해주세요.')
     edges = vertices[faces][:,[1,2,0]]-vertices[faces]
@@ -104,15 +114,19 @@ def triangulate(cloud):
     if not len(faces): raise ValueError('유효한 메시 면이 부족해요.')
     colors = np.asarray(mesh.vertex_colors)
     if len(colors) != len(vertices): colors = np.full_like(vertices,.75)
+    report(1,'삼각형 표면을 만들었어요.')
     return vertices,faces,colors
 
 
-def unwrap_surface(vertices,faces):
+def unwrap_surface(vertices,faces,iterations=2):
     import xatlas
     atlas = xatlas.Atlas()
     atlas.add_mesh(vertices.astype(np.float32),faces.astype(np.uint32))
-    charts = xatlas.ChartOptions(); charts.max_iterations = 2
-    packing = xatlas.PackOptions(); packing.resolution = TEXTURE_SIZE; packing.padding = 4
+    charts = xatlas.ChartOptions(); charts.max_iterations = iterations
+    # A fixed-resolution pack may allocate multiple sub-atlases. The room has
+    # one texture, so pack into a single atlas before normalizing to 1024 UVs.
+    packing = xatlas.PackOptions(); packing.resolution = 0; packing.padding = 4
+    packing.blockAlign = True
     atlas.generate(chart_options=charts,pack_options=packing)
     mapping,indices,coordinates = atlas[0]
     if not np.array_equal(mapping[indices],faces):
@@ -124,23 +138,35 @@ def unwrap_surface(vertices,faces):
     return uv.reshape(-1,2)
 
 
-def surface_maps(vertices,faces,colors,uv):
+def surface_maps(vertices,faces,colors,uv,report=None):
     """Rasterize every triangle into ONE room-wide non-overlapping UV atlas."""
     shape = (TEXTURE_SIZE,TEXTURE_SIZE)
     world = np.zeros((*shape,3),np.float32)
     texture = np.full((*shape,3),.7,np.float32)
     coverage = np.zeros(shape,bool)
-    for face,corners in zip(faces,uv.reshape(-1,3,2)):
-        samples = list(triangle_samples(corners,TEXTURE_SIZE,TEXTURE_SIZE))
-        if not samples: continue
-        x,y = np.array([(s[0],s[1]) for s in samples]).T
-        weights = np.array([s[2] for s in samples])
-        if np.any(coverage[y,x] & (weights.min(axis=1)>1e-4)):
+    # Compare distance to UV edges in pixels, not barycentric weights: skinny
+    # triangles magnify float32 atlas rounding into large barycentric changes.
+    # Shared edges within 0.001 pixel are valid, in either traversal order.
+    margin = np.full(shape,-np.inf,np.float32)
+    for index,(face,corners) in enumerate(zip(faces,uv.reshape(-1,3,2))):
+        if report and index%1024==0:report(index/len(faces))
+        x,y,weights=triangle_arrays(corners,TEXTURE_SIZE,TEXTURE_SIZE)
+        if not len(x):continue
+        pixels = np.asarray(corners,np.float64)*TEXTURE_SIZE
+        edge = pixels[[2,0,1]]-pixels[[1,2,0]]
+        area = abs(np.linalg.det(np.stack([pixels[1]-pixels[0],pixels[2]-pixels[0]])))
+        altitude = area/np.maximum(np.linalg.norm(edge,axis=1),1e-15)
+        interior = (weights*altitude).min(axis=1)
+        if np.any((margin[y,x]>1e-3) & (interior>1e-3)):
             raise ValueError('UV 표면이 겹쳐 텍스처를 만들 수 없어요.')
+        take = interior>margin[y,x]
+        x,y,weights,interior = x[take],y[take],weights[take],interior[take]
         world[y,x] = weights@vertices[face]
         texture[y,x] = weights@colors[face]
         coverage[y,x] = True
+        margin[y,x] = interior
     if coverage.sum() < 100: raise ValueError('텍스처를 입힐 표면이 부족해요.')
+    if report:report(1)
     return world,coverage,texture
 
 
@@ -162,7 +188,7 @@ def frame_size(frame):
     return max(64,round(width*scale/8)*8),max(64,round(height*scale/8)*8)
 
 
-def render_frame(vertices,faces,uv,frame):
+def render_frame(vertices,faces,uv,frame,report=None):
     """Z-buffer an interior input camera. No object-centered turntable cameras."""
     width,height = frame_size(frame)
     xy,z = project(vertices,frame,(width,height))
@@ -170,13 +196,13 @@ def render_frame(vertices,faces,uv,frame):
     coordinates = np.zeros((height,width,2),np.float32)
     face_uv = uv.reshape(-1,3,2)
     for index,face in enumerate(faces):
+        if report and index%1024==0:report(index/len(faces))
         values = z[face]
         if not np.isfinite(xy[face]).all() or np.any(values<=1e-6): continue
-        samples = list(triangle_samples((xy[face]+.5)/[width,height],width,height))
-        if not samples: continue
-        x,y = np.array([(s[0],s[1]) for s in samples]).T
+        x,y,weights=triangle_arrays((xy[face]+.5)/[width,height],width,height)
+        if not len(x):continue
         # Perspective correction is needed both for UVs and the z-buffer.
-        weights = np.array([s[2] for s in samples])/values
+        weights = weights/values
         denominator = weights.sum(axis=1)
         distances = 1/denominator
         take = distances<depth[y,x]
@@ -185,6 +211,7 @@ def render_frame(vertices,faces,uv,frame):
         coordinates[y,x] = (weights/denominator[:,None])@face_uv[index]
     if np.isfinite(depth).sum() < width*height*.03:
         raise ValueError('카메라에서 장면 표면이 거의 보이지 않아요. 포즈와 PLY를 확인해주세요.')
+    if report:report(1)
     return depth,coordinates
 
 
@@ -258,6 +285,21 @@ def cpu_check():
     # Exercise the deployed native wheel as well as the numerical renderer.
     packed = unwrap_surface(vertices,faces)
     if packed.shape != (12,2): raise ValueError('CPU UV check failed')
+    # An extremely narrow neighbor amplifies shared-edge float32 rounding.
+    edge=(512.5+1e-5)/TEXTURE_SIZE
+    seam_uv=np.array([[edge,.1],[edge,.9],[.1,.5],
+                      [edge,.1],[edge,.9],[edge-1e-5,.5]])
+    seam_vertices=np.column_stack([seam_uv,np.ones(6)])
+    seam_faces=np.array([[0,1,2],[3,4,5]])
+    seam_colors=np.full_like(seam_vertices,.7)
+    first=surface_maps(seam_vertices,seam_faces,seam_colors,seam_uv)
+    reverse=surface_maps(seam_vertices,seam_faces[::-1],seam_colors,
+                         seam_uv.reshape(2,3,2)[::-1].reshape(6,2))
+    np.testing.assert_array_equal(first[1],reverse[1])
+    np.testing.assert_allclose(first[0],reverse[0],atol=1e-6)
+    try:surface_maps(seam_vertices,seam_faces,seam_colors,np.tile(seam_uv[:3],(2,1)))
+    except ValueError:pass
+    else:raise ValueError('CPU true UV overlap was not rejected')
     uv = np.array([[.02,.02],[.48,.02],[.48,.98],[.02,.02],[.48,.98],[.02,.98],
                    [.52,.02],[.98,.02],[.98,.98],[.52,.02],[.98,.98],[.52,.98]])
     world,coverage,texture = surface_maps(vertices,faces,colors,uv)
@@ -273,4 +315,5 @@ def cpu_check():
     if count_again or not np.array_equal(before,texture): raise ValueError('CPU surface color lock check failed')
     _,mask,_,_ = view_inputs(texture,painted,depth,coordinates)
     if mask.getpixel((256,256)): raise ValueError('CPU inpainting mask check failed')
-    return {'ok':True,'gpu_used':False,'uv_unwrap':True,'depth_occlusion':True,'surface_color_lock':True}
+    return {'ok':True,'gpu_used':False,'uv_unwrap':True,'uv_shared_edges':True,
+            'depth_occlusion':True,'surface_color_lock':True}

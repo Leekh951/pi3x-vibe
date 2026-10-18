@@ -17,7 +17,7 @@ def load(name):
     return module
 
 
-contracts=load('contracts');writer=load('glb');raster=load('raster')
+contracts=load('contracts');writer=load('glb');raster=load('raster');cache=load('scene_cache')
 
 
 def read_glb(data):
@@ -92,7 +92,7 @@ class MeshTests(unittest.TestCase):
             output,archive=build(Path(folder)/'mesh')
             with zipfile.ZipFile(archive) as bundle:
                 self.assertEqual(set(bundle.namelist()),{p.name for p in output.iterdir() if p.is_file()})
-                for required in ('app.py','models.py','geometry.py','glb.py','contracts.py','raster.py','requirements.txt','packages.txt','README.md'):
+                for required in ('app.py','models.py','geometry.py','glb.py','contracts.py','raster.py','accelerated.py','scene_cache.py','cpu_performance.py','requirements.txt','packages.txt','README.md'):
                     self.assertIn(required,bundle.namelist())
                 self.assertNotIn('backend.py',bundle.namelist())
 
@@ -119,6 +119,21 @@ class MeshTests(unittest.TestCase):
         self.assertAlmostEqual(weights[2],1/11)
         with self.assertRaises(ValueError):
             raster.perspective_weights([.5,.25,.25],[1,-2,4])
+
+    def test_preparation_key_binds_file_contents_order_quality_and_poses(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'first').mkdir();(root/'second').mkdir()
+            for name,value in [('scene.ply',b'ply'),('one.jpg',b'one'),('two.jpg',b'two')]:
+                for subdir in ['first','second']:(root/subdir/name).write_bytes(value)
+            a=root/'first';b=root/'second'
+            key=cache.input_fingerprint(a/'scene.ply',[a/'one.jpg',a/'two.jpg'],None,'fast')
+            self.assertEqual(key,cache.input_fingerprint(b/'scene.ply',[b/'one.jpg',b/'two.jpg'],None,'fast'))
+            self.assertNotEqual(key,cache.input_fingerprint(a/'scene.ply',[a/'two.jpg',a/'one.jpg'],None,'fast'))
+            self.assertNotEqual(key,cache.input_fingerprint(a/'scene.ply',[a/'one.jpg',a/'two.jpg'],None,'detail'))
+            (b/'one.jpg').write_bytes(b'changed')
+            self.assertNotEqual(key,cache.input_fingerprint(b/'scene.ply',[b/'one.jpg',b/'two.jpg'],None,'fast'))
+            (a/'poses.json').write_text('{}')
+            self.assertNotEqual(key,cache.input_fingerprint(a/'scene.ply',[a/'one.jpg',a/'two.jpg'],a/'poses.json','fast'))
 
 
 if __name__=='__main__': unittest.main()
