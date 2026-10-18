@@ -66,8 +66,11 @@
         <label class="mesh-prompt-label" for="mesh-prompt">실내 전체를 어떤 분위기로 바꿀까요? · 영문 권장</label>
         <textarea id="mesh-prompt" rows="3" maxlength="600" placeholder="A cozy living room with oak wood, beige linen, warm neutral walls"></textarea>
         <button id="mesh-style" type="button" class="generate-button" disabled>실내 전체 텍스처 바꾸기</button>
-        <div class="mesh-progress"><p id="mesh-status" role="status" aria-live="polite">원본 메시를 먼저 만든 뒤 원하는 재질과 분위기를 적어주세요.</p><button id="mesh-cancel" type="button" class="subtle-button" hidden>대기 취소</button></div>
-        <div class="mesh-viewer"><div class="mesh-mount" id="mesh-mount" hidden></div><div id="mesh-empty"><svg><use href="#cube-icon"/></svg><strong>나만의 재질을 입힐 공간</strong><span>원본 메시를 만들면 여기에 나타나요.</span></div></div>
+        <div class="mesh-progress" id="mesh-progress-panel"><div><p id="mesh-status" role="status" aria-live="polite">원본 메시를 먼저 만든 뒤 원하는 재질과 분위기를 적어주세요.</p><span id="mesh-progress-timing" hidden></span></div><button id="mesh-cancel" type="button" class="subtle-button" hidden>대기 취소</button></div>
+        <ol id="mesh-progress-steps" class="mesh-progress-steps" aria-label="메시 작업 단계" hidden><li>서버 연결</li><li>파일 전송</li><li>장면 생성</li><li>3D 화면 표시</li></ol>
+        <div class="mesh-viewer" id="mesh-viewer" aria-busy="false"><div class="mesh-mount" id="mesh-mount" hidden></div><div id="mesh-empty"><svg><use href="#cube-icon"/></svg><strong>나만의 재질을 입힐 공간</strong><span>원본 메시를 만들면 여기에 나타나요.</span></div>
+          <div class="mesh-processing" id="mesh-processing" hidden><span class="spinner" aria-hidden="true"></span><strong id="mesh-processing-title">메시 서버에 연결하고 있어요</strong><p id="mesh-processing-detail"></p><div id="mesh-progress-bar" class="mesh-progress-bar indeterminate" role="progressbar" aria-label="서버 처리 단계" aria-valuemin="0" aria-valuemax="100"><span></span></div><span id="mesh-progress-caption"></span><div class="mesh-processing-times"><span id="mesh-processing-time"></span><span id="mesh-processing-update"></span></div><p id="mesh-processing-hint"></p></div>
+        </div>
         <div class="mesh-results"><div><button id="mesh-original" class="color-button" disabled>원본 메시</button><button id="mesh-styled" class="color-button" disabled>스타일 메시</button></div><div><a id="mesh-download" class="subtle-button" hidden>GLB 저장</a><a id="mesh-bundle" class="subtle-button" hidden>포즈·이미지 묶음</a><a id="mesh-texture" class="subtle-button" hidden>텍스처 저장</a></div></div>
         <p class="mesh-note">사진에 보이는 실내 표면을 연결해 기본 색상 텍스처를 만듭니다. 촬영되지 않은 영역과 경계에는 빈틈이 남을 수 있어요. 금속성·거칠기 생성과 영역별 선택은 아직 지원하지 않습니다.</p>
       </section>

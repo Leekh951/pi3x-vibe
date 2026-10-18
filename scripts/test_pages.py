@@ -63,8 +63,9 @@ class PagesTests(unittest.TestCase):
             self.assertIn('id="generate"', html)
             self.assertIn('id="image-input"', html)
             ids = set(re.findall(r'\bid="([^"]+)"', html))
-            for referenced_id in re.findall(r"\$\(['\"]([^'\"]+)['\"]\)", (output / "app.js").read_text()):
-                self.assertIn(referenced_id, ids, referenced_id)
+            for script in ('app.js','mesh-studio.js'):
+                for referenced_id in re.findall(r"\$\(['\"]([^'\"]+)['\"]\)", (output / script).read_text()):
+                    self.assertIn(referenced_id, ids, f'{script}: {referenced_id}')
             self.assertEqual(config["colabEndpoint"], json.loads(original_config)["colabEndpoint"])
             notebook = json.loads((output / "colab/Pi3X_SPACE.ipynb").read_text())
             for cell in notebook["cells"]:
