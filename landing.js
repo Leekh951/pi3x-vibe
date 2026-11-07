@@ -62,7 +62,7 @@ function startHero() {
   const grid = new THREE.GridHelper(3.2, 32, 0xbaff6c, 0xbaff6c);
   grid.material.transparent = true; grid.material.opacity = .07; grid.position.y = -.005; group.add(grid);
 
-  const uniforms = { uProgress: { value: reduceMotion ? 1 : 0 }, uSize: { value: 2.1 * renderer.getPixelRatio() }, uScale: { value: 1 } };
+  const uniforms = { uProgress: { value: reduceMotion ? 1 : 0 }, uSize: { value: 2.4 * renderer.getPixelRatio() }, uScale: { value: 1 } };
   const material = new THREE.ShaderMaterial({
     uniforms, transparent: true, depthWrite: false,
     vertexShader: `
