@@ -28,7 +28,7 @@ backend.load_model()
 def gpu_duration(images, quality, progress=None):
     # Three fast photos took 3.3 seconds in live inference. Reserve headroom
     # without requesting the entire anonymous budget for every small job.
-    count = min(8, max(2, len(images or [])))
+    count = min(10, max(2, len(images or [])))
     return min(90, 30 + count * 5 if quality == "fast" else 45 + count * 6)
 
 

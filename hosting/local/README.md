@@ -57,6 +57,7 @@ python scripts/set_backend.py https://pi3x.<tailnet>.ts.net   # 실제 /reconstr
 | 3장 `fast` | 2.1초 | 250,487 | 8.1GB |
 | 3장 `detail` | 0.6초 | 600,000 | 8.9GB |
 | 8장 `detail` | 1.7초 | 600,000 | 11.6GB |
+| 10장 `detail` (예시 2 아파트) | 2.2초 | 600,000 | 12.2GB |
 
 공개 주소(Funnel) 경유 3장 `fast`: 업로드 6.5초, 추론 2.2초, PLY 4.7MB 다운로드 20.1초. 집 회선은 약 4.2MB/s지만
 Funnel 중계가 약 0.1–0.25MB/s라 대기 시간 대부분은 전송입니다(gzip은 PLY를 11%만 줄여 적용하지 않음).

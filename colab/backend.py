@@ -28,6 +28,7 @@ from pi3.utils.geometry import depth_normal_edge
 
 WEIGHTS_REVISION = "bb1deea4d7423de5b30691739cb451a3f57dc1d5"
 PIXEL_LIMITS = {"fast": 90000, "detail": 230000}
+MAX_PHOTOS = 10  # 10 x detail peaked at 12.2 GB on a 16 GB RTX 4060 Ti (2026-11-07)
 OUTPUT_ROOT = Path(os.environ.get("SPACE_OUTPUT_ROOT", str(Path(tempfile.gettempdir()) / "SPACE_results")))
 OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 MODEL = None
@@ -127,8 +128,8 @@ def clean_old_results():
 def reconstruct(images, quality, progress=gr.Progress()):
     if not torch.cuda.is_available():
         raise gr.Error("GPU 서버를 준비하지 못했어요. 잠시 후 다시 시도해주세요.")
-    if not images or not 2 <= len(images) <= 8:
-        raise gr.Error("같은 공간의 사진 2–8장을 선택해주세요.")
+    if not images or not 2 <= len(images) <= MAX_PHOTOS:
+        raise gr.Error(f"같은 공간의 사진 2–{MAX_PHOTOS}장을 선택해주세요.")
     if quality not in PIXEL_LIMITS:
         raise gr.Error("지원하지 않는 품질 설정입니다.")
     started = time.monotonic()
@@ -198,7 +199,7 @@ def build_demo(inference=reconstruct, queue_size=4):
     with gr.Blocks(title="Pi3X SPACE · GPU") as demo:
         gr.Markdown("# π³ SPACE · GPU 서버\n같은 공간의 사진을 올리면 3D 점 구름을 만듭니다.\n"
                     "사진은 이 서버에서 처리됩니다. 모델 가중치는 비상업 연구·교육용입니다.")
-        images = gr.File(label="같은 공간의 사진 2–8장", file_count="multiple", type="filepath", file_types=["image"])
+        images = gr.File(label=f"같은 공간의 사진 2–{MAX_PHOTOS}장", file_count="multiple", type="filepath", file_types=["image"])
         quality = gr.Radio(choices=[("가볍게", "fast"), ("섬세하게", "detail")], value="fast", label="품질")
         run = gr.Button("3D 공간 만들기")
         output = gr.File(label="PLY 결과")

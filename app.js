@@ -4,6 +4,7 @@ import { GPUBackend, BackendUnavailable, normalizeEndpoint } from './gpu-backend
 import { jobProgress, runGPUJob, waitingRoomProgress, isQueueFull } from './gpu-job.mjs';
 import { uploadImages } from './gpu-upload.mjs';
 const $ = id => document.getElementById(id);
+const MAX_PHOTOS = 10; // matches MAX_PHOTOS in colab/backend.py
 const state = { images: [], quality: 'fast', client: null, api: null, busy: false, viewer: null, scene: 'demo', backendStatus: 'connecting', activeController: null, examplesLoading: false, manualGeneration: false };
 let toastTimer;
 function toast(message) { $('toast').textContent=message; $('toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,5500); }
@@ -29,7 +30,7 @@ function showDemo() {
   $('confidence').disabled=false; $('confidence-hint').textContent='신뢰도가 낮은 점을 숨겨요.'; syncOrientation(); setView();
 }
 function renderImages() {
-  $('image-count').textContent=`${state.images.length} / 8`;
+  $('image-count').textContent=`${state.images.length} / ${MAX_PHOTOS}`;
   $('image-list').replaceChildren();
   state.images.forEach((entry,index)=>{
     const card=document.createElement('div'); card.className='image-thumb';
@@ -45,14 +46,14 @@ async function addImages(files) {
   if(state.busy)return;
   const errors=[];
   for(const file of files) {
-    if(state.images.length>=8){errors.push('사진은 최대 8장까지 추가할 수 있어요.');break;}
+    if(state.images.length>=MAX_PHOTOS){errors.push(`사진은 최대 ${MAX_PHOTOS}장까지 추가할 수 있어요.`);break;}
     if(!['image/jpeg','image/png','image/webp'].includes(file.type)){errors.push('JPG, PNG, WEBP 사진을 선택해주세요.');continue;}
     if(file.size>15*1024*1024){errors.push('장당 15 MB 이하의 사진을 선택해주세요.');continue;}
     if(state.images.some(x=>x.file.name===file.name&&x.file.size===file.size&&x.file.lastModified===file.lastModified))continue;
     const url=URL.createObjectURL(file);
     try { const img=new Image();img.src=url;await img.decode();if(img.width<28||img.height<28)throw Error(); }
     catch { URL.revokeObjectURL(url);errors.push('읽을 수 없는 사진이 있어요. 다른 파일을 선택해주세요.');continue; }
-    if(state.busy||state.images.length>=8){URL.revokeObjectURL(url);continue;}
+    if(state.busy||state.images.length>=MAX_PHOTOS){URL.revokeObjectURL(url);continue;}
     state.images.push({file,url});
   }
   renderImages();if(errors.length)toast([...new Set(errors)].join(' '));
@@ -78,7 +79,7 @@ async function loadExample(index){
     const response=await fetch(manifestURL);
     if(!response.ok)throw Error('예시 사진 목록을 불러오지 못했어요.');
     const sets=await response.json(),set=Array.isArray(sets)?sets[index]:null,paths=set?.images;
-    if(!Array.isArray(paths)||paths.length<2||paths.length>8)throw Error('예시 사진 목록을 확인해주세요.');
+    if(!Array.isArray(paths)||paths.length<2||paths.length>MAX_PHOTOS)throw Error('예시 사진 목록을 확인해주세요.');
     const files=await Promise.all(paths.map(async path=>{
       if(typeof path!=='string')throw Error('예시 사진 목록을 확인해주세요.');
       const url=new URL(path,manifestURL);
