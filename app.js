@@ -77,7 +77,7 @@ $('image-example').onclick=async()=>{
     const response=await fetch(manifestURL);
     if(!response.ok)throw Error('예시 사진 목록을 불러오지 못했어요.');
     const paths=await response.json();
-    if(!Array.isArray(paths)||paths.length!==3)throw Error('예시 사진 3장이 아직 등록되지 않았어요.');
+    if(!Array.isArray(paths)||paths.length<2||paths.length>8)throw Error('예시 사진 목록을 확인해주세요.');
     const files=await Promise.all(paths.map(async path=>{
       if(typeof path!=='string')throw Error('예시 사진 목록을 확인해주세요.');
       const url=new URL(path,manifestURL);
@@ -97,7 +97,7 @@ $('image-example').onclick=async()=>{
     for(const image of state.images)URL.revokeObjectURL(image.url);
     state.images=[];state.manualGeneration=true;
     await addImages(files);
-    toast('예시 사진 3장을 넣었어요. ‘3D 공간 만들기’를 누르면 시작해요.');
+    toast(`예시 사진 ${files.length}장을 넣었어요. ‘3D 공간 만들기’를 누르면 시작해요.`);
   }catch(error){toast(error.message||'예시 사진을 불러오지 못했어요.');}
   finally {
     state.examplesLoading=false;$('image-example').disabled=state.busy;$('generate').disabled=state.busy;
