@@ -65,16 +65,19 @@ function scheduleGeneration(previousCount) {
   clearTimeout(autoGenerateTimer);
   autoGenerateTimer=setTimeout(()=>{if(!state.busy&&state.images.length>=2)$('generate').click();},400);
 }
-$('image-example').onclick=async()=>{
+// examples/images.json lists photo sets in button order: [{label, images:[...]}, ...].
+const exampleButtons=['image-example','image-example-2'];
+async function loadExample(index){
   if(state.busy||state.examplesLoading)return;
   clearTimeout(autoGenerateTimer);
-  state.examplesLoading=true;$('image-example').disabled=true;$('generate').disabled=true;
-  $('image-example').querySelector('span').textContent='사진 불러오는 중…';
+  const label=$(exampleButtons[index]).querySelector('span'),original=label.textContent;
+  state.examplesLoading=true;for(const id of exampleButtons)$(id).disabled=true;$('generate').disabled=true;
+  label.textContent='사진 불러오는 중…';
   try {
     const manifestURL=new URL('./examples/images.json',import.meta.url);
     const response=await fetch(manifestURL);
     if(!response.ok)throw Error('예시 사진 목록을 불러오지 못했어요.');
-    const paths=await response.json();
+    const sets=await response.json(),set=Array.isArray(sets)?sets[index]:null,paths=set?.images;
     if(!Array.isArray(paths)||paths.length<2||paths.length>8)throw Error('예시 사진 목록을 확인해주세요.');
     const files=await Promise.all(paths.map(async path=>{
       if(typeof path!=='string')throw Error('예시 사진 목록을 확인해주세요.');
@@ -95,13 +98,14 @@ $('image-example').onclick=async()=>{
     for(const image of state.images)URL.revokeObjectURL(image.url);
     state.images=[];state.manualGeneration=true;
     await addImages(files);
-    toast(`예시 사진 ${files.length}장을 넣었어요. ‘3D 공간 만들기’를 누르면 시작해요.`);
+    toast(`${set.label||'예시'} 사진 ${files.length}장을 넣었어요. ‘3D 공간 만들기’를 누르면 시작해요.`);
   }catch(error){toast(error.message||'예시 사진을 불러오지 못했어요.');}
   finally {
-    state.examplesLoading=false;$('image-example').disabled=state.busy;$('generate').disabled=state.busy;
-    $('image-example').querySelector('span').textContent='이미지 예시';
+    state.examplesLoading=false;for(const id of exampleButtons)$(id).disabled=state.busy;$('generate').disabled=state.busy;
+    label.textContent=original;
   }
-};
+}
+exampleButtons.forEach((id,index)=>{$(id).onclick=()=>loadExample(index);});
 $('image-input').onchange=async e=>{const before=state.images.length;await addImages(e.target.files);e.target.value='';scheduleGeneration(before);};
 for(const event of ['dragenter','dragover'])$('dropzone').addEventListener(event,e=>{e.preventDefault();if(!state.busy)$('dropzone').classList.add('dragover');});
 for(const event of ['dragleave','drop'])$('dropzone').addEventListener(event,e=>{e.preventDefault();$('dropzone').classList.remove('dragover');if(event==='drop'){const before=state.images.length;addImages(e.dataTransfer.files).then(()=>scheduleGeneration(before));}});
@@ -122,7 +126,7 @@ const backend = new GPUBackend({onStatus: phase => {
 }});
 function setBusy(busy) {
   state.busy=busy;$('processing').hidden=!busy;
-  for(const id of ['generate','dropzone','image-example','demo-button','import-button','export','auto-level','original-orientation','orientation-roll','orientation-pitch'])$(id).disabled=busy;
+  for(const id of ['generate','dropzone','image-example','image-example-2','demo-button','import-button','export','auto-level','original-orientation','orientation-roll','orientation-pitch'])$(id).disabled=busy;
   document.querySelectorAll('[data-quality],.remove-image').forEach(b=>b.disabled=busy);
   $('generate').querySelector('span').textContent=busy?'공간을 만드는 중…':'3D 공간 만들기';
   $('cancel-generation').disabled=!busy || !state.activeController;

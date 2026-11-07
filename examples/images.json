@@ -1,9 +1,26 @@
 [
-  "living-room-01.jpg",
-  "living-room-02.jpg",
-  "living-room-03.jpg",
-  "living-room-04.jpg",
-  "living-room-05.jpg",
-  "living-room-06.jpg",
-  "living-room-07.jpg"
+  {
+    "label": "예시 1 · 거실",
+    "images": [
+      "living-room-01.jpg",
+      "living-room-02.jpg",
+      "living-room-03.jpg",
+      "living-room-04.jpg",
+      "living-room-05.jpg",
+      "living-room-06.jpg",
+      "living-room-07.jpg"
+    ]
+  },
+  {
+    "label": "예시 2 · 아파트",
+    "images": [
+      "apartment-01.jpg",
+      "apartment-02.jpg",
+      "apartment-03.jpg",
+      "apartment-04.jpg",
+      "apartment-05.jpg",
+      "apartment-06.jpg",
+      "apartment-07.jpg"
+    ]
+  }
 ]
