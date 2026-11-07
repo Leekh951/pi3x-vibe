@@ -35,11 +35,12 @@ class SpacePackageTests(unittest.TestCase):
                 build_space(output)
 
     def test_gpu_host_allowlist(self):
-        for value in ("https://abc.gradio.live/", "https://leekh951-pi3x-vibe.hf.space/"):
+        for value in ("https://abc.gradio.live/", "https://leekh951-pi3x-vibe.hf.space/", "https://pi3x.tail1234.ts.net/"):
             self.assertEqual(normalize_endpoint(value), value[:-1])
         for value in ("http://test.hf.space", "https://test.hf.space.evil.example",
                       "https://user:secret@test.hf.space", "https://test.hf.space:8443",
-                      "https://nested.test.hf.space", "https://example.com"):
+                      "https://nested.test.hf.space", "https://example.com",
+                      "https://tail1234.ts.net", "https://a.pi3x.tail1234.ts.net", "https://pi3x.tail1234.ts.net:8443"):
             with self.assertRaises(ValueError):
                 normalize_endpoint(value)
 

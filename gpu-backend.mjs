@@ -1,7 +1,7 @@
 export function normalizeEndpoint(value) {
   let url;
   try { url = new URL(value.trim()); } catch { throw Error('GPU 서버 주소를 확인해주세요.'); }
-  if (url.protocol !== 'https:' || !/^[a-z0-9-]+\.(?:gradio\.live|hf\.space)$/i.test(url.hostname) ||
+  if (url.protocol !== 'https:' || !/^(?:[a-z0-9-]+\.(?:gradio\.live|hf\.space)|[a-z0-9-]+\.[a-z0-9-]+\.ts\.net)$/i.test(url.hostname) ||
       url.username || url.password || url.port) throw Error('GPU 서버 주소를 확인해주세요.');
   return url.origin;
 }

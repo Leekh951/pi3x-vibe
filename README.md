@@ -4,7 +4,9 @@
 
 웹 사이트: **https://leekh951.github.io/pi3x-vibe/**
 
-현재 GPU 서버: **https://huggingface.co/spaces/leekh951/pi3x-vibe** (ZeroGPU). 기본 웹 화면은 이 서버에 자동 연결하며 Colab 실행이 필요 없습니다. 2026-10-05 GPU 예약 시간을 줄인 서버에서 공식 샘플 사진 3장, `fast`로 실제 GPU 추론을 확인했습니다: 250,405개 점, 1.7초(서버 추론 시간, 업로드·대기 시간 제외), 4,757,956바이트 PLY. 모든 점의 좌표·신뢰도가 유한하고 점 개수가 메타데이터와 일치하는 것을 확인했습니다. 같은 서버에 배포된 JavaScript 클라이언트로 사진 전송·완료 이벤트·PLY 다운로드도 확인했습니다.
+현재 GPU 서버: **https://pi3x.taila3c6d9.ts.net** (운영자 PC의 RTX 4060 Ti, Tailscale Funnel). 운영 방법은 [hosting/local/README.md](hosting/local/README.md)에 있습니다. 운영자 PC가 꺼져 있으면 연결 실패를 안내합니다. 2026-11-07 공개 주소로 공식 사진 3장 `fast`를 처리했을 때 업로드 6.5초, 추론 2.2초, 결과 4.7 MB 다운로드 20.1초였습니다. Funnel 중계 대역폭(약 0.1–0.25 MB/s)이 대기 시간의 대부분입니다.
+
+이전 GPU 서버: https://huggingface.co/spaces/leekh951/pi3x-vibe (ZeroGPU). 2026-10-05 GPU 예약 시간을 줄인 서버에서 공식 샘플 사진 3장, `fast`로 실제 GPU 추론을 확인했습니다: 250,405개 점, 1.7초(서버 추론 시간, 업로드·대기 시간 제외), 4,757,956바이트 PLY. 모든 점의 좌표·신뢰도가 유한하고 점 개수가 메타데이터와 일치하는 것을 확인했습니다. 같은 서버에 배포된 JavaScript 클라이언트로 사진 전송·완료 이벤트·PLY 다운로드도 확인했습니다.
 
 ## 방문자 사용법
 

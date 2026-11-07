@@ -7,7 +7,7 @@ export function jobProgress(message, previous = {}) {
   if (started) return { started, phase: 'preparing', label: 'GPU를 준비하는 중',
     detail: '처리 요청이 시작됐어요. GPU 배정과 사진 준비를 기다리고 있어요.' };
   return { started: false, phase: 'queued', label: '처리 순서를 기다리는 중',
-    detail: message.position != null ? `서버 대기 순서 ${message.position + 1}번째 · GPU 배정 시간은 별도예요.` : '무료 공용 GPU는 혼잡하면 배정에 시간이 걸릴 수 있어요.' };
+    detail: message.position != null ? `서버 대기 순서 ${message.position + 1}번째 · GPU 배정 시간은 별도예요.` : 'GPU 서버가 앞선 요청을 처리하는 동안 기다리고 있어요.' };
 }
 
 // The SDK iterator can remain pending if a progress stream stops responding.

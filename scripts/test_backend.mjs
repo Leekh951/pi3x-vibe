@@ -11,9 +11,11 @@ function check(condition, message) { assert(condition, message); checks++; }
 
 check(normalizeEndpoint(endpoint + '/') === endpoint, 'Normalize HTTPS endpoint');
 check(normalizeEndpoint('https://leekh951-pi3x-vibe.hf.space/') === 'https://leekh951-pi3x-vibe.hf.space', 'Accept stable Space address');
+check(normalizeEndpoint('https://pi3x.tail1234.ts.net/') === 'https://pi3x.tail1234.ts.net', 'Accept home GPU Funnel address');
 for (const value of ['javascript:alert(1)', 'http://space-test.gradio.live', 'https://evil.example',
   'https://space-test.gradio.live.evil.example', 'https://user:password@space-test.gradio.live', 'https://space-test.gradio.live:8080',
-  'http://test.hf.space', 'https://test.hf.space.evil.example', 'https://user:secret@test.hf.space', 'https://test.hf.space:8443']) {
+  'http://test.hf.space', 'https://test.hf.space.evil.example', 'https://user:secret@test.hf.space', 'https://test.hf.space:8443',
+  'http://pi3x.tail1234.ts.net', 'https://tail1234.ts.net', 'https://a.pi3x.tail1234.ts.net', 'https://pi3x.tail1234.ts.net.evil.example', 'https://pi3x.tail1234.ts.net:8443']) {
   let rejected = false;
   try { normalizeEndpoint(value); } catch { rejected = true; }
   check(rejected, `Reject invalid endpoint: ${value}`);
