@@ -1,5 +1,6 @@
 """Prepare the static Pages artifact with Python's standard library only."""
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -47,8 +48,30 @@ def build(output, repository=None, viewer_url=None, ref=None):
     (output / "space.config.json").write_text(
         json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+    version_assets(output)
     print(f"Pages 파일 준비 완료: {output}")
     return config
+
+
+# GitHub Pages serves every file with max-age=600. Without versioned URLs a visitor can
+# run a cached app.js against a newer examples/images.json (or vice versa) for ten minutes
+# after a deploy. One content hash per build makes each page load a consistent set.
+JS_REFERENCE = re.compile(r"""((?:from\s*|import\s*\(\s*|new URL\s*\(\s*)(['"]))(\./(?!vendor/)[^'"?]+\.(?:js|mjs|json|bin))(\2)""")
+HTML_REFERENCE = re.compile(r'((?:src|href)=")([A-Za-z0-9_.-]+\.(?:js|css))(")')
+
+
+def version_assets(output):
+    digest = hashlib.sha256()
+    for path in sorted(output.rglob("*")):
+        if path.is_file():
+            digest.update(path.relative_to(output).as_posix().encode() + b"\0" + path.read_bytes())
+    version = digest.hexdigest()[:10]
+    for path in output.glob("*"):
+        if path.suffix in (".js", ".mjs"):
+            path.write_text(JS_REFERENCE.sub(rf"\1\3?v={version}\4", path.read_text(encoding="utf-8")), encoding="utf-8")
+        elif path.suffix == ".html":
+            path.write_text(HTML_REFERENCE.sub(rf"\1\2?v={version}\3", path.read_text(encoding="utf-8")), encoding="utf-8")
+    return version
 
 
 def main():

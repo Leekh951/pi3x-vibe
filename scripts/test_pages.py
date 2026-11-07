@@ -48,6 +48,14 @@ class PagesTests(unittest.TestCase):
                     self.assertIn('typeof window&&"WebSocket"in window', source)
                     relative = [value for value in relative if value != "./wrapper-CviSselG.js"]
                 references.extend((script.relative_to(output).as_posix(), value) for value in relative)
+            # Every site asset is requested with the same build version, so a page loads one consistent set.
+            versions = {value.split("?v=")[1] for _, value in references if "?v=" in value}
+            self.assertEqual(len(versions), 1, versions)
+            for source, value in (("index.html", "app.js"), ("index.html", "landing.css"), ("app.js", "./gpu-backend.mjs"),
+                                  ("app.js", "./examples/images.json"), ("landing.js", "./landing-cloud.bin")):
+                self.assertIn((source, f"{value}?v={next(iter(versions))}"), references)
+            self.assertFalse(any("vendor/" in value and "?v=" in value for _, value in references))
+            references = [(source, value.split("?")[0]) for source, value in references]
             self.assertIn(("app.js", "./gpu-backend.mjs"), references)
             self.assertIn(("gpu-backend.mjs", "./space.config.json"), references)
             prefix = urlsplit(config["viewerUrl"]).path
