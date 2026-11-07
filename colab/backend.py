@@ -189,8 +189,12 @@ def viewer_connection_url(viewer_url, public_url):
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
-def build_demo(inference=reconstruct):
-    """Both hosts expose the same named API and PLY/JSON output contract."""
+def build_demo(inference=reconstruct, queue_size=4):
+    """Both hosts expose the same named API and PLY/JSON output contract.
+
+    One GPU job runs at a time; up to queue_size more wait in line. Shared GPUs keep
+    the small default; a dedicated home GPU can afford a longer line.
+    """
     with gr.Blocks(title="Pi3X SPACE · GPU") as demo:
         gr.Markdown("# π³ SPACE · GPU 서버\n같은 공간의 사진을 올리면 3D 점 구름을 만듭니다.\n"
                     "사진은 이 서버에서 처리됩니다. 모델 가중치는 비상업 연구·교육용입니다.")
@@ -201,7 +205,7 @@ def build_demo(inference=reconstruct):
         metadata = gr.JSON(label="재구성 정보")
         run.click(inference, inputs=[images, quality], outputs=[output, metadata],
                   api_name="reconstruct", concurrency_limit=1)
-    demo.queue(max_size=4, default_concurrency_limit=1)
+    demo.queue(max_size=queue_size, default_concurrency_limit=1)
     return demo
 
 

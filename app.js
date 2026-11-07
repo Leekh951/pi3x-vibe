@@ -1,7 +1,7 @@
 import { makeDemo } from './demo.js';
 import { SpaceViewer } from './viewer.js';
 import { GPUBackend, BackendUnavailable, normalizeEndpoint } from './gpu-backend.mjs';
-import { jobProgress, watchGPUJob } from './gpu-job.mjs';
+import { jobProgress, runGPUJob, waitingRoomProgress, isQueueFull } from './gpu-job.mjs';
 import { uploadImages } from './gpu-upload.mjs';
 const $ = id => document.getElementById(id);
 const state = { images: [], quality: 'fast', client: null, api: null, busy: false, viewer: null, scene: 'demo', backendStatus: 'connecting', activeController: null, examplesLoading: false, manualGeneration: false };
@@ -142,7 +142,6 @@ $('generate').onclick=async()=>{
     status('사진을 전송하고 있어요.');
     $('processing-label').textContent='사진을 보내는 중';$('processing-detail').textContent='업로드 후 사진 속 공간을 이어줍니다.';
     const images=await uploadImages(state.client,connection.endpoint,state.images.map(x=>x.file));
-    const job=state.client.submit('/reconstruct',{images,quality:state.quality});
     state.activeController=new AbortController();$('cancel-generation').disabled=false;
     const startedAt=performance.now();
     let progress={phase:'upload',label:'사진을 보내는 중',detail:'업로드 후 사진 속 공간을 이어줍니다.'};
@@ -152,14 +151,9 @@ $('generate').onclick=async()=>{
       $('processing-detail').textContent=progress.detail+` · ${seconds}초 경과`;
     };
     elapsedTimer=setInterval(updateProgress,1000);
-    let output;
-    for await(const message of watchGPUJob(job,{signal:state.activeController.signal})) {
-      if(message.type==='data')output=message.data;
-      if(message.type==='status') {
-        if(message.stage==='error')throw Error(message.message||'공간을 만들지 못했어요. 다시 시도해주세요.');
-        progress=jobProgress(message,progress);updateProgress();
-      }
-    }
+    const output=await runGPUJob(()=>state.client.submit('/reconstruct',{images,quality:state.quality}),{signal:state.activeController.signal,
+      onStatus:message=>{progress=jobProgress(message,progress);updateProgress();},
+      onWaitingRoom:(attempt,total)=>{progress=waitingRoomProgress(attempt,total);updateProgress();}});
     clearInterval(elapsedTimer);
     state.activeController=null;$('cancel-generation').disabled=true;
     const file=output?.[0];
@@ -184,7 +178,7 @@ $('generate').onclick=async()=>{
     $('confidence').disabled=!result.hasConfidence;$('confidence-hint').textContent=result.hasConfidence?'신뢰도가 낮은 점을 숨겨요.':'이 파일에는 신뢰도 정보가 없어요.';
     syncOrientation();setView();status(`완성됐어요${meta.elapsed_seconds?` · ${meta.elapsed_seconds}초`:''}. 회전하며 공간을 살펴보세요.`);toast('나만의 3D 공간이 완성됐어요.');
   }catch(e){
-    const message=e instanceof BackendUnavailable || ['AbortError','TimeoutError'].includes(e.name) ? e.message : /quota|daily.*GPU|GPU.*budget/i.test(e.message||'') ? '무료 GPU 사용량이 부족해요. 사용량이 초기화된 뒤 다시 시도해주세요.' : '공간을 만들지 못했어요. 사진 수를 줄이거나 다른 사진으로 다시 시도해주세요.';
+    const message=e instanceof BackendUnavailable || ['AbortError','TimeoutError'].includes(e.name) ? e.message : isQueueFull(e.message) ? '지금 이용자가 많아요. 잠시 후 다시 시도해주세요.' : /quota|daily.*GPU|GPU.*budget/i.test(e.message||'') ? '무료 GPU 사용량이 부족해요. 사용량이 초기화된 뒤 다시 시도해주세요.' : '공간을 만들지 못했어요. 사진 수를 줄이거나 다른 사진으로 다시 시도해주세요.';
     status(message,true);toast(message);state.client=null;backend.invalidate();
     console.warn('Reconstruction:',e.message);
   }

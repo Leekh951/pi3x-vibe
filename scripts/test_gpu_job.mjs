@@ -1,7 +1,9 @@
-import { jobProgress, watchGPUJob } from '../gpu-job.mjs';
+import { jobProgress, watchGPUJob, runGPUJob, isQueueFull, waitingRoomProgress } from '../gpu-job.mjs';
 const assert = (value, description) => { if (!value) throw Error(description); };
 const queued = jobProgress({ stage: 'pending', position: 0 });
-assert(queued.phase === 'queued' && queued.detail.includes('1번째'), 'Show server queue before handler starts');
+assert(queued.phase === 'queued' && queued.detail.startsWith('바로 다음 차례'), 'Position 0 means next in line');
+assert(jobProgress({ stage: 'pending', position: 3, eta: 7.2 }).detail === '앞에 3명이 기다리고 있어요. · 예상 약 8초', 'Show people ahead and the estimate');
+assert(!jobProgress({ stage: 'pending', position: 2, eta: null }).detail.includes('예상'), 'No estimate before the server has timing history');
 const started = jobProgress({ stage: 'pending', position: 0, original_msg: 'process_starts' }, queued);
 assert(started.phase === 'preparing' && !started.label.includes('순서'), 'Gradio pending process_starts is GPU preparation, not first place in queue');
 const active = jobProgress({ stage: 'pending', progress_data: [{ desc: 'Pi3X 추론 중' }] }, started);
@@ -57,3 +59,24 @@ try {
 } catch (error) { assert(error.message === 'Invalid file type', 'Server error is shown even when SDK return() hangs'); }
 finally { clearTimeout(errorTimer); }
 console.log('GPU start/progress labels, result delivery, stalled stream timeout and visitor cancellation passed.');
+
+// Waiting room: a full queue is retried with the same upload, not shown as a failure.
+assert(isQueueFull('This application is currently busy. Please try again. ') && !isQueueFull('Invalid file type'), 'Recognize Gradio queue-full rejection');
+const busyThenOk = () => { let calls = 0; const submit = () => { calls++;
+  const value = calls < 3 ? { type: 'status', stage: 'error', message: 'This application is currently busy. Please try again. ' } : { type: 'data', data: ['room.ply'] };
+  let sent = false; return { next: async () => sent ? { done: true } : (sent = true, { done: false, value }), cancel() {}, return: async () => ({ done: true }) }; };
+  return { submit, calls: () => calls }; };
+const flaky = busyThenOk(), rooms = [];
+const result = await runGPUJob(flaky.submit, { retryDelay: 1, retries: 5, onWaitingRoom: (attempt, total) => rooms.push(waitingRoomProgress(attempt, total).detail) });
+assert(result[0] === 'room.ply' && flaky.calls() === 3 && rooms.length === 2 && rooms[1].includes('2/5'), 'Rejoin after queue-full and report attempts');
+const exhausted = busyThenOk(); let gaveUp = false;
+try { await runGPUJob(exhausted.submit, { retryDelay: 1, retries: 1 }); }
+catch (error) { gaveUp = isQueueFull(error.message); }
+assert(gaveUp && exhausted.calls() === 2, 'Give up after the retry budget with the queue-full reason');
+const stopWaiting = new AbortController(), busyAlways = { next: async () => ({ done: false, value: { type: 'status', stage: 'error', message: 'This application is currently busy.' } }), cancel() {}, return: async () => ({ done: true }) };
+const waiting = runGPUJob(() => ({ ...busyAlways }), { signal: stopWaiting.signal, retryDelay: 10000 });
+setTimeout(() => stopWaiting.abort(), 20);
+try { await waiting; throw Error('should abort'); } catch (error) { assert(error.name === 'AbortError', 'Cancel stops the waiting room immediately'); }
+const invalid = runGPUJob(() => ({ next: async () => ({ done: false, value: { type: 'status', stage: 'error', message: 'Invalid file type' } }), cancel() {}, return: async () => ({ done: true }) }), { retryDelay: 1 });
+try { await invalid; throw Error('should fail'); } catch (error) { assert(error.message === 'Invalid file type', 'Other server errors are not retried'); }
+console.log('PASS queue position, estimate, waiting room retry, cancel and non-retryable errors');

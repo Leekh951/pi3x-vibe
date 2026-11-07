@@ -22,7 +22,8 @@ CACHE_SWEEP = (3600, 6 * 3600)
 
 def main():
     backend.load_model()
-    demo = backend.build_demo()
+    # One GPU job at a time; PI3X_QUEUE_SIZE more may wait (the site retries when it is full).
+    demo = backend.build_demo(queue_size=int(os.environ.get("PI3X_QUEUE_SIZE", "16")))
     demo.delete_cache = CACHE_SWEEP
     demo.launch(server_name="127.0.0.1", server_port=int(os.environ.get("PI3X_PORT", "7860")),
                 share=False, show_error=True, max_file_size="15mb", ssr_mode=False)
