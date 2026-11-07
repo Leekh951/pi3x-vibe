@@ -61,6 +61,14 @@ class PagesTests(unittest.TestCase):
             for removed in ('id="connect-dialog"', 'id="notebook-dialog"', 'id="colab-open"', 'id="endpoint"'):
                 self.assertNotIn(removed, html)
             self.assertIn('id="generate"', html)
+            # Landing overlay: shown first, skipped for #studio / ?colab / ?test, and its hero cloud is shipped.
+            self.assertIn('id="landing"', html)
+            self.assertGreaterEqual(html.count('data-enter'), 2)
+            self.assertIn("location.hash==='#studio'", html)
+            self.assertLess(html.index('id="landing"'), html.index('<main class="workspace"'))
+            cloud = (output / "landing-cloud.bin").read_bytes()
+            self.assertEqual(cloud[:4], b"P3C1")
+            self.assertEqual(len(cloud), 8 + int.from_bytes(cloud[4:8], "little") * 9)
             self.assertIn('id="image-input"', html)
             ids = set(re.findall(r'\bid="([^"]+)"', html))
             for script in ('app.js','mesh-studio.js'):
