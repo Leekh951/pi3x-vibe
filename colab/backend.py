@@ -108,7 +108,7 @@ def save_cloud(path, points, colors, confidence):
         records[key] = colors[:, i]
     records["confidence"] = confidence
     header = ("ply\nformat binary_little_endian 1.0\n"
-              "comment Pi3X SPACE; OpenCV camera-to-world coordinates\n"
+              "comment Pi3X SPACE; OpenCV coordinates of the first photo's camera\n"
               f"element vertex {count}\nproperty float x\nproperty float y\nproperty float z\n"
               "property uchar red\nproperty uchar green\nproperty uchar blue\n"
               "property float confidence\nend_header\n")
@@ -148,7 +148,13 @@ def reconstruct(images, quality, progress=gr.Progress()):
         masks = (scores >= .01) & torch.isfinite(result["points"]).all(dim=-1)
         masks &= ~depth_normal_edge(result["local_points"], rtol=.03, mask=masks)
         selection = masks[0].cpu().numpy()
-        points = result["points"][0].float().cpu().numpy()[selection]
+        # Pi3X has no fixed reference view, so its world frame can be tilted arbitrarily
+        # (50 degrees seen for one room). Express the cloud in the first photo's camera
+        # frame: handheld photos keep camera Y near gravity, which the viewer's
+        # automatic levelling relies on.
+        reference = torch.linalg.inv(result["camera_poses"][0, 0].float())
+        world = result["points"][0].float()
+        points = (world @ reference[:3, :3].T + reference[:3, 3]).cpu().numpy()[selection]
         confidence = scores[0].cpu().numpy()[selection]
         colors = rgb[selection]
         if not len(points):
@@ -162,7 +168,7 @@ def reconstruct(images, quality, progress=gr.Progress()):
         metadata = {"engine": "Pi3X", "image_count": len(images), "point_count": len(points),
                     "resolution": list(target), "quality": quality,
                     "elapsed_seconds": round(time.monotonic() - started, 1),
-                    "coordinate_system": "OpenCV", "weights_revision": WEIGHTS_REVISION}
+                    "coordinate_system": "OpenCV, first photo camera", "weights_revision": WEIGHTS_REVISION}
         progress(1, desc="완성! 브라우저로 공간을 보내고 있어요.")
         return str(output), metadata
     except torch.cuda.OutOfMemoryError:
