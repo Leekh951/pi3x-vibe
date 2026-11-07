@@ -67,7 +67,6 @@
         <article class="lp-card lp-reveal"><span class="icon"><svg viewBox="0 0 24 24"><path d="M3 17h18M6 17l3-9 3 5 3-3 3 7"/></svg></span><h3>자동 수평 맞추기</h3><p>바닥을 찾아 공간을 바로 세우고, 필요하면 직접 미세하게 조절해요.</p></article>
         <article class="lp-card lp-reveal"><span class="icon"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg></span><h3>신뢰도 필터</h3><p>확신이 낮은 점을 걸러 경계의 노이즈를 깔끔하게 정리합니다.</p></article>
         <article class="lp-card lp-reveal"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span><h3>PLY 내보내기</h3><p>색과 신뢰도를 담은 점 구름을 저장해 Blender, MeshLab에서 이어서 작업하세요.</p></article>
-        <article class="lp-card lp-reveal"><span class="icon"><svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4z"/><path d="M4 7v10l8 4 8-4V7"/></svg></span><h3>Mesh Studio<span class="lp-tag">실험적</span></h3><p>점 구름을 텍스처가 입혀진 메시로 바꾸고, 프롬프트로 공간의 분위기를 바꿔봐요.</p></article>
       </div>
     </section>
 
@@ -126,24 +125,6 @@
       </details>
       <div class="scene-details"><div class="scene-stat"><span>공간을 이루는 점</span><strong id="point-count">—</strong></div><div class="scene-stat"><span>입력 사진</span><strong id="result-image-count">예제 장면</strong></div><div class="scene-stat"><span>재구성 엔진</span><strong id="engine-label">예제 · 합성 데이터</strong></div><div class="confidence-control"><label for="confidence">노이즈 정리 <output id="confidence-value">10%</output></label><input type="range" id="confidence" min="0" max="95" step="5" value="10"><span id="confidence-hint">신뢰도가 낮은 점을 숨겨요.</span></div></div>
       <div class="studio-footnote"><span>사진에서 점으로, 점에서 공간으로.</span><span>POWERED BY <a href="https://github.com/yyfz/Pi3" target="_blank" rel="noopener">π³ / Pi3X</a></span></div>
-      <section class="mesh-studio" aria-labelledby="mesh-title">
-        <div class="mesh-heading"><div><span class="eyebrow">MAKE IT YOUR OWN</span><h2 id="mesh-title">같은 공간, 새로운 분위기</h2></div><a href="https://huggingface.co/spaces/leekh951/pi3x-mesh" class="subtle-button" target="_blank" rel="noopener">메시 Space 열기 ↗</a></div>
-        <p class="mesh-intro">Pi3X로 재구성한 실내 전체에 새로운 재질을 입혀보세요. 벽과 바닥, 가구를 포함한 공간의 구조는 유지됩니다.</p>
-        <div class="mesh-inputs"><p id="mesh-source">위에서 Pi3X 결과를 만들거나 PLY와 원본 사진을 선택해주세요.</p><div class="mesh-file-actions"><label>PLY 선택<input id="mesh-ply" type="file" accept=".ply"></label><label>원본 사진 선택<input id="mesh-images" type="file" accept="image/jpeg,image/png,image/webp" multiple></label></div>
-          <details class="mesh-camera-settings"><summary>카메라 포즈가 있나요?</summary><label>포즈 JSON<input id="mesh-poses" type="file" accept=".json"></label><label>PLY 생성 품질<select id="mesh-quality"><option value="fast">가볍게</option><option value="detail">섬세하게</option></select></label><p>포즈 파일이 없으면 새 Space에서 같은 사진으로 카메라를 복원합니다. 추가 GPU 작업이 필요해요.</p></details>
-          <button id="mesh-prepare" type="button" class="orientation-button">원본 메시 만들기</button>
-        </div>
-        <label class="mesh-prompt-label" for="mesh-prompt">실내 전체를 어떤 분위기로 바꿀까요? · 영문 권장</label>
-        <textarea id="mesh-prompt" rows="3" maxlength="600" placeholder="A cozy living room with oak wood, beige linen, warm neutral walls"></textarea>
-        <button id="mesh-style" type="button" class="generate-button" disabled>실내 전체 텍스처 바꾸기</button>
-        <div class="mesh-progress" id="mesh-progress-panel"><div><p id="mesh-status" role="status" aria-live="polite">원본 메시를 먼저 만든 뒤 원하는 재질과 분위기를 적어주세요.</p><span id="mesh-progress-timing" hidden></span></div><button id="mesh-cancel" type="button" class="subtle-button" hidden>대기 취소</button></div>
-        <ol id="mesh-progress-steps" class="mesh-progress-steps" aria-label="메시 작업 단계" hidden><li>서버 연결</li><li>파일 전송</li><li>장면 생성</li><li>3D 화면 표시</li></ol>
-        <div class="mesh-viewer" id="mesh-viewer" aria-busy="false"><div class="mesh-mount" id="mesh-mount" hidden></div><div id="mesh-empty"><svg><use href="#cube-icon"/></svg><strong>나만의 재질을 입힐 공간</strong><span>원본 메시를 만들면 여기에 나타나요.</span></div>
-          <div class="mesh-processing" id="mesh-processing" hidden><span class="spinner" aria-hidden="true"></span><strong id="mesh-processing-title">메시 서버에 연결하고 있어요</strong><p id="mesh-processing-detail"></p><div id="mesh-progress-bar" class="mesh-progress-bar indeterminate" role="progressbar" aria-label="서버 처리 단계" aria-valuemin="0" aria-valuemax="100"><span></span></div><span id="mesh-progress-caption"></span><div class="mesh-processing-times"><span id="mesh-processing-time"></span><span id="mesh-processing-update"></span></div><p id="mesh-processing-hint"></p></div>
-        </div>
-        <div class="mesh-results"><div><button id="mesh-original" class="color-button" disabled>원본 메시</button><button id="mesh-styled" class="color-button" disabled>스타일 메시</button></div><div><a id="mesh-download" class="subtle-button" hidden>GLB 저장</a><a id="mesh-bundle" class="subtle-button" hidden>포즈·이미지 묶음</a><a id="mesh-texture" class="subtle-button" hidden>텍스처 저장</a></div></div>
-        <p class="mesh-note">사진에 보이는 실내 표면을 연결해 기본 색상 텍스처를 만듭니다. 촬영되지 않은 영역과 경계에는 빈틈이 남을 수 있어요. 금속성·거칠기 생성과 영역별 선택은 아직 지원하지 않습니다.</p>
-      </section>
     </section>
   </main>
   <dialog id="guide-dialog"><form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="닫기">×</button></form><span class="eyebrow">A LITTLE GUIDE</span><h2>좋은 공간은 좋은 사진에서.</h2><div class="guide-item"><span>01</span><div><h3>같은 공간, 다른 각도</h3><p>카메라 위치를 조금씩 옮겨 촬영하세요. 이웃 사진 사이에 같은 물체가 충분히 겹치면 좋아요.</p></div></div><div class="guide-item"><span>02</span><div><h3>밝고, 선명하고, 가만히</h3><p>흔들림과 움직이는 사람을 피하세요. 거울이나 반짝이는 표면, 아무 무늬 없는 벽은 재구성이 어려울 수 있어요.</p></div></div><div class="guide-item"><span>03</span><div><h3>사진을 올리면 공간이 펼쳐져요</h3><p>사진 2–8장을 올리면 자동으로 생성을 시작해요. 잠시 기다리면 이 화면에 결과가 나타납니다. 설정을 바꾼 뒤 다시 만들고 싶다면 ‘3D 공간 만들기’를 누르세요. 처음에는 ‘가볍게’와 사진 3–4장을 추천해요.</p></div></div><div class="guide-item"><span>04</span><div><h3>손끝으로 탐색하세요</h3><p>드래그로 회전, 휠로 확대, 우클릭으로 이동해요. 모바일에서는 한 손가락으로 회전하고 두 손가락으로 확대·이동할 수 있어요.</p></div></div><div class="guide-note">결과는 색이 있는 점 구름이에요. 정밀한 치수 측정이나 완성된 메시 모델과는 차이가 있어요. 예제 장면은 조작 체험을 위한 합성 데이터입니다.</div></dialog>

@@ -79,7 +79,9 @@ class PagesTests(unittest.TestCase):
             self.assertEqual(len(cloud), 8 + int.from_bytes(cloud[4:8], "little") * 9)
             self.assertIn('id="image-input"', html)
             ids = set(re.findall(r'\bid="([^"]+)"', html))
-            for script in ('app.js','mesh-studio.js'):
+            self.assertNotIn('mesh-studio', html)
+            self.assertFalse((output / 'mesh-studio.js').exists())
+            for script in ('app.js',):
                 for referenced_id in re.findall(r"\$\(['\"]([^'\"]+)['\"]\)", (output / script).read_text()):
                     self.assertIn(referenced_id, ids, f'{script}: {referenced_id}')
             self.assertEqual(config["colabEndpoint"], json.loads(original_config)["colabEndpoint"])

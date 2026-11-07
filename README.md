@@ -53,6 +53,8 @@ GPU 할당 요청도 남은 사용량보다 작아야 합니다. 초기 Space에
 
 ## 실내 전체 메시·텍스처: 별도 Mesh Studio
 
+> **2026-11-07부터 웹 화면에서 숨김.** Mesh Space는 아직 ZeroGPU 할당량에 의존하고 GPU 추론·품질을 검증하지 않았습니다. 코드(`mesh-studio.js`, `mesh-viewer.js`, `mesh-progress.mjs`, `hosting/mesh-huggingface/`)와 테스트는 유지합니다. 다시 켜려면 `index.html`의 Mesh 섹션, `app.js`의 `initMeshStudio`/`setSource` 연결, `scripts/build_pages.py`의 배포 목록을 되돌리세요(커밋 기록 참고).
+
 원래 Pi3X Space와 점군 뷰어를 유지하면서 아래에 [pi3x-mesh](https://huggingface.co/spaces/leekh951/pi3x-mesh)를 연결합니다. 입력은 Pi3X PLY와 같은 사진 2–8장, 선택적으로 카메라 포즈 JSON입니다. 포즈가 없으면 새 Space에서 복원하므로 추가 GPU 작업이 필요합니다.
 
 처리 단위는 **실내 전체 장면**입니다. 벽·바닥·가구를 포함한 메시의 UV를 만들고 실제 실내 카메라에서 메시 깊이를 렌더링합니다. 깊이를 조건으로 텍스처를 생성한 뒤 하나의 공유 UV에 저장하며, 앞 시점에서 칠한 표면은 다음 시점에서 유지합니다. 원본·스타일 GLB의 형상과 UV는 동일합니다. FLUX 사진 편집 방식은 사용하지 않습니다.
