@@ -36,16 +36,10 @@ body.landing-open{overflow:hidden}
 .lp-hero-copy{padding:calc(120px + env(safe-area-inset-top,0px)) clamp(18px,6vw,96px) 96px;max-width:720px}
 .lp-eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:12px;font-weight:700;letter-spacing:.18em;color:var(--lime);text-transform:uppercase}
 .lp-eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 12px var(--lime)}
-.lp-hero h1{margin:22px 0 22px;font-size:clamp(40px,6.4vw,84px);line-height:1.04;letter-spacing:-.045em;font-weight:800}
+.lp-hero h1{margin:22px 0 22px;white-space:nowrap;font-size:clamp(34px,5.4vw,76px);line-height:1.04;letter-spacing:-.045em;font-weight:800}
 .lp-hero h1 em{font-style:normal;color:var(--lime)}
 .lp-lede{margin:0 0 36px;font-size:clamp(16px,1.5vw,19px);line-height:1.7;color:var(--soft);max-width:34em}
 .lp-actions{display:flex;flex-wrap:wrap;gap:12px}
-.lp-stats{display:flex;flex-wrap:wrap;gap:clamp(20px,4vw,48px);margin:56px 0 0;padding:24px 0 0;border-top:1px solid var(--line)}
-.lp-stats div{min-width:0}
-.lp-stats dt{font-size:12px;color:var(--soft);letter-spacing:.04em}
-.lp-stats dd{margin:6px 0 0;font-size:clamp(24px,2.6vw,32px);font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
-.lp-stats dd small{font-size:.55em;font-weight:600;color:var(--soft);margin-left:3px}
-.lp-footnote{margin:14px 0 0;font-size:12px;color:#71838c}
 .lp-live{position:absolute;right:clamp(18px,4vw,56px);bottom:32px;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;
   background:#0b141caa;border:1px solid var(--line);backdrop-filter:blur(8px);font-size:12px;color:var(--soft);max-width:min(440px,calc(100% - 36px))}
 .lp-live b{color:var(--ink);font-weight:700}
@@ -61,7 +55,7 @@ body.landing-open{overflow:hidden}
 .lp-section-head p{margin:0;color:var(--soft);font-size:17px;line-height:1.7}
 
 .lp-proof{display:grid;grid-template-columns:minmax(0,1.5fr) auto minmax(0,1fr);align-items:center;gap:clamp(16px,3vw,40px)}
-.lp-photos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.lp-photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .lp-photos figure:first-child{grid-column:1/-1}
 .lp-photos figure{margin:0}
 .lp-photos img{width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:12px;display:block;border:1px solid var(--line)}

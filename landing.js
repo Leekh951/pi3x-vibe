@@ -57,12 +57,12 @@ function startHero() {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(38, 1, .01, 50);
   const group = new THREE.Group(); scene.add(group);
-  const target = new THREE.Vector3(0, .2, 0);
+  const target = new THREE.Vector3(0, .1, 0);
 
   const grid = new THREE.GridHelper(3.2, 32, 0xbaff6c, 0xbaff6c);
   grid.material.transparent = true; grid.material.opacity = .07; grid.position.y = -.005; group.add(grid);
 
-  const uniforms = { uProgress: { value: reduceMotion ? 1 : 0 }, uSize: { value: 2.6 * renderer.getPixelRatio() }, uScale: { value: 1 } };
+  const uniforms = { uProgress: { value: reduceMotion ? 1 : 0 }, uSize: { value: 2.1 * renderer.getPixelRatio() }, uScale: { value: 1 } };
   const material = new THREE.ShaderMaterial({
     uniforms, transparent: true, depthWrite: false,
     vertexShader: `
@@ -120,7 +120,7 @@ function startHero() {
     renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix();
     uniforms.uScale.value = height / 330; // ~2.5 CSS px per point at the orbit distance on a 900px-tall hero
     // Shift the projection, not the room: wide screens put it right of the headline, narrow ones above it.
-    camera.setViewOffset(width, height, wide ? -width * .2 : 0, wide ? 0 : height * .2, width, height);
+    camera.setViewOffset(width, height, wide ? -width * .24 : 0, wide ? 0 : height * .2, width, height);
   };
   new ResizeObserver(resize).observe(canvas); resize();
 
@@ -138,8 +138,8 @@ function startHero() {
       if (!reduceMotion) { uniforms.uProgress.value = Math.min(1, (now - startedAt) / 2600); angle += dt * .12; }
     }
     pointer.x += (pointer.tx - pointer.x) * .04; pointer.y += (pointer.ty - pointer.y) * .04;
-    const distance = wide ? 2.75 : 3.3, a = angle + pointer.x * .25;
-    camera.position.set(Math.sin(a) * distance, 1.05 + pointer.y * -.18, Math.cos(a) * distance);
+    const distance = wide ? 3.3 : 3.9, a = angle + pointer.x * .25;
+    camera.position.set(Math.sin(a) * distance, 1.6 + pointer.y * -.18, Math.cos(a) * distance);
     camera.lookAt(target);
     renderer.render(scene, camera);
     schedule();

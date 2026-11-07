@@ -23,20 +23,14 @@
       <canvas class="lp-canvas" id="lp-canvas" aria-hidden="true"></canvas>
       <div class="lp-hero-copy">
         <span class="lp-eyebrow">Photo → Space · Powered by Pi3X</span>
-        <h1>사진 세 장이면,<br><em>공간</em>이 됩니다.</h1>
+        <h1>사진 일곱 장이면,<br><em>공간</em>이 됩니다.</h1>
         <p class="lp-lede">같은 곳을 다른 각도에서 찍은 사진을 올리세요. Pi3X가 몇 초 만에 3D 공간으로 다시 세웁니다. 설치도, 가입도 필요 없어요. 브라우저에서 바로 돌려보고 저장하세요.</p>
         <div class="lp-actions">
           <button class="lp-enter large" type="button" data-enter>들어가기<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
           <a class="lp-ghost" href="#lp-how">작동 방식 보기</a>
         </div>
-        <dl class="lp-stats">
-          <div><dt>입력 사진</dt><dd>3<small>장</small></dd></div>
-          <div><dt>재구성된 점</dt><dd>233,581</dd></div>
-          <div><dt>GPU 처리</dt><dd>0.8<small>초</small></dd></div>
-        </dl>
-        <p class="lp-footnote">오른쪽 장면 기준 · 서버 GPU(RTX 4060 Ti) 처리 시간이며 업로드·전송 시간은 제외됩니다.</p>
       </div>
-      <div class="lp-live" hidden><i aria-hidden="true"></i><span><b>실제 결과</b> · 아래 사진 3장을 Pi3X로 재구성한 점 구름입니다.</span></div>
+      <div class="lp-live" hidden><i aria-hidden="true"></i><span><b>실제 결과</b> · 아래 사진 7장을 Pi3X로 재구성한 점 구름입니다.</span></div>
       <span class="lp-scroll" aria-hidden="true"></span>
     </header>
 
@@ -44,12 +38,16 @@
       <div class="lp-section-head lp-reveal"><span class="lp-eyebrow">From photos to space</span><h2>평범한 사진에서<br>걸어 들어갈 수 있는 공간으로.</h2><p>깊이 센서도, 카메라 위치 정보도 필요 없습니다. 사진만으로 공간의 형태와 색을 함께 복원합니다.</p></div>
       <div class="lp-proof lp-reveal">
         <div class="lp-photos">
-          <figure><img src="examples/living-room-01.jpg" alt="거실 정면 사진" loading="lazy" width="960" height="540"><figcaption>사진 1</figcaption></figure>
-          <figure><img src="examples/living-room-02.jpg" alt="같은 거실을 오른쪽에서 찍은 사진" loading="lazy" width="960" height="540"><figcaption>사진 2</figcaption></figure>
-          <figure><img src="examples/living-room-03.jpg" alt="같은 거실의 창가 쪽 사진" loading="lazy" width="960" height="540"><figcaption>사진 3</figcaption></figure>
+          <figure><img src="examples/living-room-01.jpg" alt="소파와 커피 테이블이 있는 거실 정면" loading="lazy" width="960" height="540"><figcaption>사진 1</figcaption></figure>
+          <figure><img src="examples/living-room-02.jpg" alt="같은 거실을 오른쪽에서 본 모습" loading="lazy" width="960" height="540"><figcaption>사진 2</figcaption></figure>
+          <figure><img src="examples/living-room-03.jpg" alt="창가 쪽 소파와 쿠션" loading="lazy" width="960" height="540"><figcaption>사진 3</figcaption></figure>
+          <figure><img src="examples/living-room-04.jpg" alt="천장까지 보이는 거실 전경" loading="lazy" width="960" height="540"><figcaption>사진 4</figcaption></figure>
+          <figure><img src="examples/living-room-05.jpg" alt="수납장과 문이 있는 벽" loading="lazy" width="960" height="540"><figcaption>사진 5</figcaption></figure>
+          <figure><img src="examples/living-room-06.jpg" alt="수납장 정면" loading="lazy" width="960" height="540"><figcaption>사진 6</figcaption></figure>
+          <figure><img src="examples/living-room-07.jpg" alt="문과 스탠드 조명이 있는 벽" loading="lazy" width="960" height="540"><figcaption>사진 7</figcaption></figure>
         </div>
         <span class="lp-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-        <div class="lp-result"><strong>233,581개의 점</strong><span>사진 3장이 색을 가진 하나의 3D 공간이 됐어요. 위의 장면이 바로 그 결과입니다.</span>
+        <div class="lp-result"><strong>하나의 3D 공간</strong><span>사진 7장이 색을 가진 점 구름으로 이어졌어요. 위의 장면이 바로 그 결과입니다.</span>
           <ul><li>사진마다 다른 시점을 자동으로 정렬</li><li>바닥을 찾아 수평을 자동으로 보정</li><li>PLY로 저장해 다른 3D 도구에서 열기</li></ul></div>
       </div>
     </section>
