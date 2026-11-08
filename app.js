@@ -229,7 +229,7 @@ $('export').onclick=()=>{
 };
 try {
   state.viewer=new SpaceViewer($('canvas-mount'),count=>$('point-count').textContent=new Intl.NumberFormat('ko-KR').format(count));showDemo();
-  $('canvas-mount').querySelector('canvas').setAttribute('aria-label','드래그로 회전하고 확대할 수 있는 3D 점 구름');
+  $('canvas-mount').querySelector('canvas').setAttribute('aria-label','드래그로 회전하고 확대할 수 있는 3D 점군');
   document.documentElement.dataset.ready='true';
 }catch(e){$('viewer-error').hidden=false;$('viewer-error').textContent='3D 화면을 시작하지 못했어요. Chrome 또는 Edge에서 하드웨어 가속을 켠 뒤 다시 열어주세요.';console.error(e);}
 // Read-only browser test access; exposed only when explicitly requested.

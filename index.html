@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101a23">
-  <meta name="description" content="사진 몇 장에서 시작하는 나만의 3D 공간. 사진을 올리면 Pi3X가 공간을 재구성합니다. 브라우저에서 3D 점 구름을 탐색하세요.">
+  <meta name="description" content="사진 몇 장에서 시작하는 나만의 3D 공간. 사진을 올리면 Pi3X가 공간을 재구성합니다. 브라우저에서 3D 점군을 탐색하세요.">
   <title>π³ SPACE — 사진이 공간이 되는 곳</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23baff6c'/%3E%3Ctext x='9' y='29' font-size='30' font-family='serif' fill='%23101a23'%3Eπ%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
@@ -24,13 +24,13 @@
       <div class="lp-hero-copy">
         <span class="lp-eyebrow">Photo → Space · Powered by Pi3X</span>
         <h1>사진 몇 장을,<br>둘러볼 수 있는 <em>3D</em>로.</h1>
-        <p class="lp-lede">여러 각도에서 찍은 사진을 올리면<br>공간을 3D 점 구름으로 복원합니다.<br>결과는 브라우저에서 바로 보고 PLY 파일로 저장할 수 있습니다.</p>
+        <p class="lp-lede">여러 각도에서 찍은 사진을 올리면<br>공간을 3D 점군으로 복원합니다.<br>결과는 브라우저에서 바로 보고 PLY 파일로 저장할 수 있습니다.</p>
         <div class="lp-actions">
           <button class="lp-enter large" type="button" data-enter>들어가기<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
           <a class="lp-ghost" href="#lp-how">작동 방식 보기</a>
         </div>
       </div>
-      <div class="lp-live" hidden><i aria-hidden="true"></i><span><b>실제 결과</b> · 아래 사진 7장을 Pi3X로 재구성한 점 구름입니다.</span></div>
+      <div class="lp-live" hidden><i aria-hidden="true"></i><span><b>실제 결과</b> · 아래 사진 7장을 Pi3X로 재구성한 점군입니다.</span></div>
       <span class="lp-scroll" aria-hidden="true"></span>
     </header>
 
@@ -47,7 +47,7 @@
           <figure><img src="examples/living-room-07.jpg" alt="문과 스탠드 조명이 있는 벽" loading="lazy" width="960" height="540"><figcaption>사진 7</figcaption></figure>
         </div>
         <span class="lp-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-        <div class="lp-result"><strong>3D 점 구름</strong><span>사진 7장을 하나의 컬러 점 구름으로 합쳤습니다. 위 화면이 그 결과입니다.</span>
+        <div class="lp-result"><strong>3D 점군</strong><span>사진 7장을 하나의 컬러 점군으로 합쳤습니다. 위 화면이 그 결과입니다.</span>
           <ul><li>사진마다 다른 시점을 자동으로 정렬</li><li>바닥을 찾아 수평을 자동으로 보정</li><li>PLY로 저장해 다른 3D 도구에서 열기</li></ul></div>
       </div>
     </section>
@@ -66,7 +66,7 @@
       <div class="lp-features">
         <article class="lp-card lp-reveal"><span class="icon"><svg viewBox="0 0 24 24"><path d="M3 17h18M6 17l3-9 3 5 3-3 3 7"/></svg></span><h3>자동 수평 맞추기</h3><p>바닥 면을 찾아 수평을 자동으로 맞춥니다. 필요하면 직접 조절할 수 있습니다.</p></article>
         <article class="lp-card lp-reveal"><span class="icon"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg></span><h3>신뢰도 필터</h3><p>신뢰도가 낮은 점을 걸러 경계의 노이즈를 줄입니다.</p></article>
-        <article class="lp-card lp-reveal"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span><h3>PLY 내보내기</h3><p>색상과 신뢰도가 포함된 점 구름을 저장해 Blender, MeshLab 등에서 사용할 수 있습니다.</p></article>
+        <article class="lp-card lp-reveal"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span><h3>PLY 내보내기</h3><p>색상과 신뢰도가 포함된 점군을 저장해 Blender, MeshLab 등에서 사용할 수 있습니다.</p></article>
       </div>
     </section>
 
@@ -127,7 +127,7 @@
       <div class="studio-footnote"><span>사진에서 점으로, 점에서 공간으로.</span><span>POWERED BY <a href="https://github.com/yyfz/Pi3" target="_blank" rel="noopener">π³ / Pi3X</a></span></div>
     </section>
   </main>
-  <dialog id="guide-dialog"><form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="닫기">×</button></form><span class="eyebrow">A LITTLE GUIDE</span><h2>촬영 및 사용 가이드</h2><div class="guide-item"><span>01</span><div><h3>여러 각도에서 촬영하기</h3><p>카메라 위치를 조금씩 옮겨 촬영하세요. 이웃 사진 사이에 같은 물체가 충분히 겹치면 좋아요.</p></div></div><div class="guide-item"><span>02</span><div><h3>흔들림 없이 밝게 촬영하기</h3><p>흔들림과 움직이는 사람을 피하세요. 거울이나 반짝이는 표면, 아무 무늬 없는 벽은 재구성이 어려울 수 있어요.</p></div></div><div class="guide-item"><span>03</span><div><h3>업로드하고 생성하기</h3><p>사진 2–10장을 올리면 자동으로 생성을 시작해요. 잠시 기다리면 이 화면에 결과가 나타납니다. 설정을 바꾼 뒤 다시 만들고 싶다면 ‘3D 공간 만들기’를 누르세요. 처음에는 ‘가볍게’와 사진 3–4장을 추천해요.</p></div></div><div class="guide-item"><span>04</span><div><h3>결과 확인하기</h3><p>드래그로 회전, 휠로 확대, 우클릭으로 이동해요. 모바일에서는 한 손가락으로 회전하고 두 손가락으로 확대·이동할 수 있어요.</p></div></div><div class="guide-note">결과는 색이 있는 점 구름이에요. 정밀한 치수 측정이나 완성된 메시 모델과는 차이가 있어요. 예제 장면은 조작 체험을 위한 합성 데이터입니다.</div></dialog>
+  <dialog id="guide-dialog"><form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="닫기">×</button></form><span class="eyebrow">A LITTLE GUIDE</span><h2>촬영 및 사용 가이드</h2><div class="guide-item"><span>01</span><div><h3>여러 각도에서 촬영하기</h3><p>카메라 위치를 조금씩 옮겨 촬영하세요. 이웃 사진 사이에 같은 물체가 충분히 겹치면 좋아요.</p></div></div><div class="guide-item"><span>02</span><div><h3>흔들림 없이 밝게 촬영하기</h3><p>흔들림과 움직이는 사람을 피하세요. 거울이나 반짝이는 표면, 아무 무늬 없는 벽은 재구성이 어려울 수 있어요.</p></div></div><div class="guide-item"><span>03</span><div><h3>업로드하고 생성하기</h3><p>사진 2–10장을 올리면 자동으로 생성을 시작해요. 잠시 기다리면 이 화면에 결과가 나타납니다. 설정을 바꾼 뒤 다시 만들고 싶다면 ‘3D 공간 만들기’를 누르세요. 처음에는 ‘가볍게’와 사진 3–4장을 추천해요.</p></div></div><div class="guide-item"><span>04</span><div><h3>결과 확인하기</h3><p>드래그로 회전, 휠로 확대, 우클릭으로 이동해요. 모바일에서는 한 손가락으로 회전하고 두 손가락으로 확대·이동할 수 있어요.</p></div></div><div class="guide-note">결과는 색이 있는 점군이에요. 정밀한 치수 측정이나 완성된 메시 모델과는 차이가 있어요. 예제 장면은 조작 체험을 위한 합성 데이터입니다.</div></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg"><defs>
     <symbol id="upload-icon" viewBox="0 0 24 24"><path d="M12 16V4m-5 5 5-5 5 5M4 15v5h16v-5"/></symbol>

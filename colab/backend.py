@@ -143,7 +143,7 @@ def reconstruct(images, quality, progress=gr.Progress()):
         dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
         with torch.inference_mode(), torch.amp.autocast("cuda", dtype=dtype):
             result = model(imgs=tensor)
-        progress(.82, desc="경계의 노이즈를 정리하고 점 구름을 만들고 있어요.")
+        progress(.82, desc="경계의 노이즈를 정리하고 점군을 만들고 있어요.")
         scores = torch.sigmoid(result["conf"][..., 0]).float()
         # Preserve low confidence values so the user can adjust filtering live.
         masks = (scores >= .01) & torch.isfinite(result["points"]).all(dim=-1)
@@ -197,7 +197,7 @@ def build_demo(inference=reconstruct, queue_size=4):
     the small default; a dedicated home GPU can afford a longer line.
     """
     with gr.Blocks(title="Pi3X SPACE · GPU") as demo:
-        gr.Markdown("# π³ SPACE · GPU 서버\n같은 공간의 사진을 올리면 3D 점 구름을 만듭니다.\n"
+        gr.Markdown("# π³ SPACE · GPU 서버\n같은 공간의 사진을 올리면 3D 점군을 만듭니다.\n"
                     "사진은 이 서버에서 처리됩니다. 모델 가중치는 비상업 연구·교육용입니다.")
         images = gr.File(label=f"같은 공간의 사진 2–{MAX_PHOTOS}장", file_count="multiple", type="filepath", file_types=["image"])
         quality = gr.Radio(choices=[("가볍게", "fast"), ("섬세하게", "detail")], value="fast", label="품질")
