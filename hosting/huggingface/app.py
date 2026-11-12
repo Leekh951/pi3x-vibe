@@ -26,10 +26,11 @@ backend.load_model()
 
 
 def gpu_duration(images, quality, progress=None):
-    # Three fast photos took 3.3 seconds in live inference. Reserve headroom
-    # without requesting the entire anonymous budget for every small job.
+    # Ten detail photos take about 2-3 s of inference. ZeroGPU refuses a job whose
+    # requested duration exceeds the visitor's remaining quota, so ask for a short
+    # window (model transfer included) to fit more jobs into each visitor's budget.
     count = min(10, max(2, len(images or [])))
-    return min(90, 30 + count * 5 if quality == "fast" else 45 + count * 6)
+    return 20 + count * 2 if quality == "fast" else 25 + count * 3
 
 
 @spaces.GPU(duration=gpu_duration)
@@ -37,7 +38,10 @@ def reconstruct(images, quality, progress=gr.Progress()):
     return backend.reconstruct(images, quality, progress)
 
 
-demo = backend.build_demo(reconstruct)
+# A full queue sends the visitor's page to the operator's GPU instead of waiting.
+demo = backend.build_demo(reconstruct, queue_size=8)
+# Uploaded photos and results: checked hourly, removed after 6 hours (same as the home server).
+demo.delete_cache = (3600, 6 * 3600)
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860, share=False,
                 show_error=True, max_file_size="15mb", ssr_mode=False)

@@ -50,9 +50,12 @@ class SpacePackageTests(unittest.TestCase):
         namespace = {}
         exec(compile(ast.Module(body=[duration], type_ignores=[]), "gpu_duration", "exec"), namespace)
         estimate = namespace["gpu_duration"]
-        self.assertEqual(estimate(["photo"] * 3, "fast"), 45)
-        self.assertLess(estimate(["photo"] * 3, "detail"), 120)
-        self.assertLessEqual(estimate(["photo"] * 8, "detail"), 90)
+        # Inference takes a few seconds; short requests leave room for more jobs per visitor quota.
+        self.assertEqual(estimate(["photo"] * 3, "fast"), 26)
+        self.assertLessEqual(estimate(["photo"] * 10, "fast"), 40)
+        self.assertGreaterEqual(estimate(["photo"] * 2, "detail"), 25)
+        self.assertLessEqual(estimate(["photo"] * 10, "detail"), 60)
+        self.assertEqual(estimate(["photo"] * 30, "detail"), estimate(["photo"] * 10, "detail"))
 
 
 if __name__ == "__main__":

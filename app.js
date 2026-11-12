@@ -3,6 +3,7 @@ import { SpaceViewer } from './viewer.js';
 import { GPUBackend, BackendUnavailable, normalizeEndpoint } from './gpu-backend.mjs';
 import { jobProgress, runGPUJob, waitingRoomProgress, isQueueFull } from './gpu-job.mjs';
 import { uploadImages } from './gpu-upload.mjs';
+import { runWithFailover, isQuotaError, quotaExhausted, rememberQuotaExhausted } from './gpu-failover.mjs';
 const $ = id => document.getElementById(id);
 const MAX_PHOTOS = 10; // matches MAX_PHOTOS in colab/backend.py
 const state = { images: [], quality: 'fast', client: null, api: null, busy: false, viewer: null, scene: 'demo', backendStatus: 'connecting', activeController: null, examplesLoading: false, manualGeneration: false };
@@ -118,13 +119,25 @@ document.querySelectorAll('[data-quality]').forEach(button=>button.onclick=()=>{
 $('guide-open').onclick=()=>$('guide-dialog').showModal();
 const guide = $('guide-dialog');
 guide.addEventListener('click',e=>{if(e.target!==guide)return;const r=guide.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)guide.close();});
-const backend = new GPUBackend({onStatus: phase => {
+// Free Hugging Face ZeroGPU Space first; the operator's GPU (home) takes over when it fails.
+const serverStatus = { space: 'connecting', home: 'connecting' };
+const showServerStatus = () => {
+  const phases = Object.values(serverStatus);
+  const phase = phases.includes('ready') ? 'ready' : phases.includes('connecting') ? 'connecting' : 'offline';
   state.backendStatus = phase;
   $('connection-dot').classList.toggle('connected', phase === 'ready');
   $('connection-dot').classList.toggle('connecting', phase === 'connecting');
   $('connection-label').textContent = phase === 'ready' ? '서버 연결됨' : phase === 'connecting' ? '서버 연결 중' : '서버 준비 중';
   if (!state.busy) renderImages();
-}});
+};
+const spaceBackend = new GPUBackend({configKey: 'spaceEndpoint', onStatus: phase => { serverStatus.space = phase; showServerStatus(); }});
+const backend = new GPUBackend({onStatus: phase => { serverStatus.home = phase; showServerStatus(); }});
+let sessionOnly = false; // a ?colab= test link uses only that server
+const servers = [
+  { name: 'space', label: 'Hugging Face GPU', connectTimeout: 20000,
+    connect: () => spaceBackend.ensureReady(), skip: () => sessionOnly || quotaExhausted() },
+  { name: 'home', label: '운영자 GPU', connect: () => backend.ensureReady() },
+];
 function setBusy(busy) {
   state.busy=busy;$('processing').hidden=!busy;
   for(const id of ['generate','dropzone','image-example','image-example-2','demo-button','import-button','export','auto-level','original-orientation','orientation-roll','orientation-pitch'])$(id).disabled=busy;
@@ -140,9 +153,9 @@ $('generate').onclick=async()=>{
   if(state.images.length<2){toast('같은 공간의 사진을 2장 이상 추가해주세요.');$('dropzone').focus();return;}
   setBusy(true);status('사진을 처리할 준비를 하고 있어요.');
   $('processing-label').textContent='공간 만들기를 준비하는 중';$('processing-detail').textContent='잠시만 기다려주세요.';
-  let elapsedTimer;
-  try {
-    const connection = await backend.ensureReady();
+  let elapsedTimer, quotaHit=false;
+  const attempt=async connection=>{
+    clearInterval(elapsedTimer);
     state.client = connection.client; state.api = connection.api;
     status('사진을 전송하고 있어요.');
     $('processing-label').textContent='사진을 보내는 중';$('processing-detail').textContent='업로드 후 사진 속 공간을 이어줍니다.';
@@ -158,7 +171,9 @@ $('generate').onclick=async()=>{
     elapsedTimer=setInterval(updateProgress,1000);
     const output=await runGPUJob(()=>state.client.submit('/reconstruct',{images,quality:state.quality}),{signal:state.activeController.signal,
       onStatus:message=>{progress=jobProgress(message,progress);updateProgress();},
-      onWaitingRoom:(attempt,total)=>{progress=waitingRoomProgress(attempt,total);updateProgress();}});
+      onWaitingRoom:(attempt,total)=>{progress=waitingRoomProgress(attempt,total);updateProgress();},
+      // A full Space queue moves on to the next server instead of waiting.
+      retries:connection===spaceBackend?0:24});
     clearInterval(elapsedTimer);
     state.activeController=null;$('cancel-generation').disabled=true;
     const file=output?.[0];
@@ -174,16 +189,29 @@ $('generate').onclick=async()=>{
       url=new URL(`${prefix}/file=${encodeURIComponent(file.path)}`,endpoint);
     }
     const response=await fetch(url.href);if(!response.ok)throw Error('결과를 가져오지 못했어요. 다시 시도해주세요.');
-    const resultBuffer=await response.arrayBuffer();
-    const result=state.viewer.parsePLY(resultBuffer);state.scene='result';
-    const meta=output[1]||{};
+    return {buffer:await response.arrayBuffer(),meta:output[1]||{}};
+  };
+  try {
+    const {result:{buffer,meta},target}=await runWithFailover(servers,attempt,{
+      onFailure:(server,error)=>{
+        console.warn(`Reconstruction on ${server.name}:`,error?.message);
+        if(server.name==='space'&&isQuotaError(error?.message)){quotaHit=true;rememberQuotaExhausted();}
+        if(server.name==='space')spaceBackend.invalidate();
+      },
+      onSwitch:(from,to,error)=>{
+        clearInterval(elapsedTimer);state.activeController=null;$('cancel-generation').disabled=true;
+        const reason=isQuotaError(error?.message)?'무료 GPU 사용량이 다 찼어요.':'무료 GPU 서버가 지금 응답하지 않아요.';
+        status(`${reason} ${to.label}로 옮겨서 처리할게요.`);
+        $('processing-label').textContent='다른 GPU 서버로 옮기는 중';$('processing-detail').textContent=`${reason} ${to.label}에서 이어서 처리할게요.`;
+      }});
+    const result=state.viewer.parsePLY(buffer);state.scene='result';
     $('scene-title').textContent='3D 시각화 공간';$('scene-tag').innerHTML='<span></span>YOUR RECONSTRUCTION';
     $('scene-caption-title').textContent='My reconstructed space';$('scene-description').textContent='사진 속 공간이 새로운 시점으로 펼쳐집니다.';
     $('result-image-count').textContent=`${meta.image_count||state.images.length}장`;$('engine-label').textContent='Pi3X';
     $('confidence').disabled=!result.hasConfidence;$('confidence-hint').textContent=result.hasConfidence?'신뢰도가 낮은 점을 숨겨요.':'이 파일에는 신뢰도 정보가 없어요.';
-    syncOrientation();setView();status(`완성됐어요${meta.elapsed_seconds?` · ${meta.elapsed_seconds}초`:''}. 회전하며 공간을 살펴보세요.`);toast('나만의 3D 공간이 완성됐어요.');
+    syncOrientation();setView();status(`완성됐어요${meta.elapsed_seconds?` · ${meta.elapsed_seconds}초`:''} · ${target.label}. 회전하며 공간을 살펴보세요.`);toast('나만의 3D 공간이 완성됐어요.');
   }catch(e){
-    const message=e instanceof BackendUnavailable || ['AbortError','TimeoutError'].includes(e.name) ? e.message : isQueueFull(e.message) ? '지금 이용자가 많아요. 잠시 후 다시 시도해주세요.' : /quota|daily.*GPU|GPU.*budget/i.test(e.message||'') ? '무료 GPU 사용량이 부족해요. 사용량이 초기화된 뒤 다시 시도해주세요.' : '공간을 만들지 못했어요. 사진 수를 줄이거나 다른 사진으로 다시 시도해주세요.';
+    const message=['AbortError','TimeoutError'].includes(e.name) ? e.message : quotaHit ? '무료 GPU 사용량이 다 찼고, 운영자 GPU 서버도 지금은 사용할 수 없어요. 잠시 후 다시 시도해주세요.' : e instanceof BackendUnavailable ? e.message : isQueueFull(e.message) ? '지금 이용자가 많아요. 잠시 후 다시 시도해주세요.' : isQuotaError(e.message) ? '무료 GPU 사용량이 부족해요. 사용량이 초기화된 뒤 다시 시도해주세요.' : '공간을 만들지 못했어요. 사진 수를 줄이거나 다른 사진으로 다시 시도해주세요.';
     status(message,true);toast(message);state.client=null;backend.invalidate();
     console.warn('Reconstruction:',e.message);
   }
@@ -233,7 +261,7 @@ try {
   document.documentElement.dataset.ready='true';
 }catch(e){$('viewer-error').hidden=false;$('viewer-error').textContent='3D 화면을 시작하지 못했어요. Chrome 또는 Edge에서 하드웨어 가속을 켠 뒤 다시 열어주세요.';console.error(e);}
 // Read-only browser test access; exposed only when explicitly requested.
-if(new URLSearchParams(location.search).has('test'))window.spaceTest={state,backend,addImages,normalizeEndpoint,showDemo};
+if(new URLSearchParams(location.search).has('test'))window.spaceTest={state,backend,spaceBackend,addImages,normalizeEndpoint,showDemo};
 
 // The owner can test a running session via the Colab return link. Visitors
 // normally use the endpoint in the published configuration automatically.
@@ -241,7 +269,10 @@ const colabEndpoint = new URLSearchParams(location.search).get('colab');
 if(colabEndpoint) {
   const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('colab');
   history.replaceState(null,'',cleanUrl);
-  try { backend.useSessionEndpoint(colabEndpoint); } catch(error) { console.warn(error.message); }
+  try { backend.useSessionEndpoint(colabEndpoint); sessionOnly=true; serverStatus.space='offline'; } catch(error) { console.warn(error.message); }
 }
-backend.ensureReady().then(connection=>{state.client=connection.client;state.api=connection.api;})
-  .catch(()=>{if(!state.busy)status('지금은 서버를 준비하고 있어요. 예제 공간을 먼저 둘러보세요.');});
+// Warm both servers on arrival: this also wakes a sleeping Space for the first job.
+const useSpace=!sessionOnly&&!quotaExhausted();
+if(!useSpace)serverStatus.space='offline';
+Promise.allSettled([useSpace?spaceBackend.ensureReady():Promise.reject(Error('skipped')),backend.ensureReady()])
+  .then(results=>{if(!state.busy&&results.every(r=>r.status==='rejected'))status('지금은 서버를 준비하고 있어요. 예제 공간을 먼저 둘러보세요.');});

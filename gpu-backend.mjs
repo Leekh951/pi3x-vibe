@@ -19,7 +19,8 @@ export class GPUBackend {
     if (!response.ok) throw new BackendUnavailable();
     return response.json();
   }, loadClient = () => import('./vendor/gradio-client.js'), onStatus = () => {}, timeout = 25000,
-    spaceTimeout = 180000, retryDelay = 3000 } = {}) {
+    spaceTimeout = 180000, retryDelay = 3000, configKey = 'colabEndpoint' } = {}) {
+    this.configKey = configKey; // which space.config.json field holds this server's address
     this.fetchConfig = fetchConfig; this.loadClient = loadClient; this.onStatus = onStatus;
     this.timeout = timeout; this.client = null; this.api = null; this.endpoint = ''; this.pending = null;
     this.sessionEndpoint = '';
@@ -46,7 +47,7 @@ export class GPUBackend {
     armDeadline(this.timeout);
     const opening = (async () => {
       const config = this.sessionEndpoint ? {} : await this.fetchConfig();
-      const address = this.sessionEndpoint || config.colabEndpoint;
+      const address = this.sessionEndpoint || config[this.configKey];
       if (!address) throw new BackendUnavailable();
       const endpoint = normalizeEndpoint(address);
       if (expired) throw new BackendUnavailable();

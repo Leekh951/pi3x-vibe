@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE_FILES = (
-    "index.html", "styles.css", "landing.css", "landing.js", "landing-cloud.bin", "app.js", "gpu-backend.mjs", "gpu-job.mjs", "gpu-upload.mjs", "viewer.js", "orientation.mjs", "demo.js",
+    "index.html", "styles.css", "landing.css", "landing.js", "landing-cloud.bin", "app.js", "gpu-backend.mjs", "gpu-job.mjs", "gpu-failover.mjs", "gpu-upload.mjs", "viewer.js", "orientation.mjs", "demo.js",
     ".nojekyll", "colab/Pi3X_SPACE.ipynb",
     # Mesh Studio (mesh-studio.js, mesh-viewer.js, mesh-progress.mjs) is kept in the repo but not published.
 )

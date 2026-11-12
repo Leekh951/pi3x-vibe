@@ -4,9 +4,14 @@
 
 웹 사이트: **https://leekh951.github.io/pi3x-vibe/**
 
-현재 GPU 서버: **https://pi3x.taila3c6d9.ts.net** (운영자 PC의 RTX 4060 Ti, Tailscale Funnel). 운영 방법은 [hosting/local/README.md](hosting/local/README.md)에 있습니다. 운영자 PC가 꺼져 있으면 연결 실패를 안내합니다. 2026-11-07 공개 주소로 공식 사진 3장 `fast`를 처리했을 때 업로드 6.5초, 추론 2.2초, 결과 4.7 MB 다운로드 20.1초였습니다. Funnel 중계 대역폭(약 0.1–0.25 MB/s)이 대기 시간의 대부분입니다.
+GPU 서버는 두 곳을 순서대로 씁니다 (`space.config.json`).
 
-이전 GPU 서버: https://huggingface.co/spaces/leekh951/pi3x-vibe (ZeroGPU). 2026-10-05 GPU 예약 시간을 줄인 서버에서 공식 샘플 사진 3장, `fast`로 실제 GPU 추론을 확인했습니다: 250,405개 점, 1.7초(서버 추론 시간, 업로드·대기 시간 제외), 4,757,956바이트 PLY. 모든 점의 좌표·신뢰도가 유한하고 점 개수가 메타데이터와 일치하는 것을 확인했습니다. 같은 서버에 배포된 JavaScript 클라이언트로 사진 전송·완료 이벤트·PLY 다운로드도 확인했습니다.
+1. **`spaceEndpoint`** — https://huggingface.co/spaces/leekh951/pi3x-vibe (무료 ZeroGPU). 먼저 이 서버로 보냅니다.
+2. **`colabEndpoint`** — https://pi3x.taila3c6d9.ts.net (운영자 PC의 RTX 4060 Ti, Tailscale Funnel). 운영 방법은 [hosting/local/README.md](hosting/local/README.md)에 있습니다.
+
+Space가 ZeroGPU 사용량 초과를 알리거나, 20초 안에 연결되지 않거나(잠든 Space), 대기열이 가득 찼거나, 처리에 실패하면 같은 사진으로 운영자 GPU에서 다시 처리합니다(`gpu-failover.mjs`). 사용량 초과를 겪은 방문자는 그날 자정까지 Space를 건너뜁니다(브라우저 localStorage). 운영자 PC가 꺼져 있으면 Space만으로 처리합니다. 방문자가 취소한 작업은 다른 서버로 넘기지 않습니다. Space 코드는 `scripts/build_space.py`로 만든 `dist/huggingface/`를 업로드해 갱신합니다.
+
+2026-11-07 Funnel 공개 주소로 공식 사진 3장 `fast`를 처리했을 때 업로드 6.5초, 추론 2.2초, 결과 4.7 MB 다운로드 20.1초였습니다. Funnel 중계 대역폭(약 0.1–0.25 MB/s)이 대기 시간의 대부분입니다. 2026-10-05 ZeroGPU Space에서는 공식 샘플 사진 3장 `fast`로 250,405개 점, 1.7초(서버 추론 시간), 4,757,956바이트 PLY를 확인했습니다.
 
 ## 방문자 사용법
 

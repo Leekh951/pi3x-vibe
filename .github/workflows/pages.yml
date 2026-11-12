@@ -33,6 +33,8 @@ jobs:
         run: node scripts/test_backend.mjs
       - name: Validate GPU progress and cancellation
         run: node scripts/test_gpu_job.mjs
+      - name: Validate Space-first GPU failover
+        run: node scripts/test_failover.mjs
       - name: Validate mesh progress and bounded waits
         run: node scripts/test_mesh_progress.mjs
       - name: Validate public GPU browser transport
